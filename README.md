@@ -7,13 +7,13 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 ## 전체 그림
 
 ```
-[상류] 누구를 위해 / 왜              [하류] 만든 UI가 쓸 만한가
- refs/ux-research/      ──읽기──▶    ai-usability-test 스킬
- (페르소나·여정 단일출처)             (Playwright 3페르소나 자동 검증)
-                                            │
-                                            ▼
-                                   MCP `ut:` done 게이트
-                                   (S4 결함 → Phase 자동 차단)
+[사전] 만들기 전 공백 점검        [상류] 누구를 위해 / 왜        [하류] 만든 UI가 쓸 만한가
+ ux-audit (PRD·정적)     ──▶    refs/ux-research/   ──읽기──▶  ai-usability-test 스킬
+ (7렌즈 휴리스틱 진단)             (페르소나·여정 단일출처)        (Playwright 3페르소나 자동 검증)
+                                                                      │
+                                                                      ▼
+                                                             MCP `ut:` done 게이트
+                                                             (S4 결함 → Phase 자동 차단)
 ```
 
 사람이 눈으로 보던 UX 검수를, **코드가 숫자로 검사해 자동으로 막는 강제 게이트**로 전환한 묶음이다.
@@ -25,6 +25,7 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 
 | 파일 | 역할 |
 |---|---|
+| `ux-audit.md` | **PRD·플로우·와이어프레임 사전 진단(shift-left).** 7개 UX 렌즈(플로우·인증·결제·에러복구·멘탈모델·빈상태·피드백) 휴리스틱으로 공백을 하나씩 질문해 잡는다. 코드 작성 전 단계, 자문형(점수·게이트 없음) |
 | `ai-usability-test.md` | Playwright + 3페르소나(초보/파워/접근성) + Nielsen 휴리스틱 자동 사용성 테스트. 산출물 5종 생성, MCP `ut:` done 기준 |
 | `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 7종 주입. 단일 source 공급 |
 | `ui-design-workflow.md` | PRD→0단계 게이트→3안 발산→확정 락→상태설계→자가점검→0-드리프트 전사→AI UT 게이트 |
@@ -89,3 +90,4 @@ done:
 
 - 본 묶음은 D2A 보일러플레이트 본체에서 발췌한 것으로, 단독 실행보다는 본체 구조(`.claude/`, `d2a-mcp-server/`, `refs/`) 안에 배치해 사용하는 것을 전제로 한다.
 - `refs/ux-research/` 9종은 **빈 템플릿**으로 배포된다. 특정 서비스의 실데이터는 포함하지 않으며, `ux-research-sync` 스킬이 프로젝트 시작 시 실제 리서치 데이터로 채운다.
+- `ux-audit.md` 는 replatform-playground/ux-audit-skill(v2.2.0)에서 도입했다. 범용 번들에 맞춰 **Step 2.5만 완화**(사내 `gamescale-expert` 하드 의존 → "사내 표준 스킬 있으면 참조, 없으면 업계 표준") 했고, 7개 렌즈 분석 본문은 원문 그대로다.
