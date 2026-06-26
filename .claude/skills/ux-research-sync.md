@@ -91,15 +91,32 @@ Step 2의 Findings를 페르소나/여정 항목에 매핑하며, 각 항목에 
 
 ---
 
-## Step 4 — 7종 주입 (실증 링크 + 한계 명시)
+## Step 3.5 — 여정 지도 적용 판단 (조건부 게이트)
 
-분류 결과를 `refs/ux-research/` 7종에 반영한다. **단일 source 규약**(README) 준수 — 페르소나/여정은
-PERSONA.md / USER_JOURNEY_MAP.md 에서만 정의하고 하위 스킬은 읽기만 한다.
+`USER_JOURNEY_MAP.md` 를 채울지 **1문으로 결정**한다. 단일 과업형 프로젝트에 빈 껍데기 여정맵을 만들지 않기 위함이다.
+
+🔶 질문: 이 서비스가 **다단계 흐름(유입→사용→재방문)** 또는 **리텐션/퍼널 지표**가 핵심인가?
+
+- **예 (소비자 서비스·다단계)** → `USER_JOURNEY_MAP.md` 를 정상 작성한다 (Step 4에서 주입).
+- **아니오 (단일/소수 화면 과업 도구·사내 어드민)** → 여정맵을 작성하지 않고:
+  - `USER_JOURNEY_MAP.md` 맨 위에 `> 상태: N/A — 단일 과업형 (사유). 페르소나 → 시나리오로 직행.` 표기
+  - `PERSONA.md → USER_SCENARIOS.md` 만 채워 검증 파이프라인을 잇는다
+  - 결정 근거를 `collaboration-tracker.md` 에 1줄 기록한다
+
+> N/A 처리해도 `ai-usability-test` 는 폴백(`USER_SCENARIOS.md` · spec.md)으로 정상 동작한다.
+
+---
+
+## Step 4 — 8종 주입 (실증 링크 + 한계 명시)
+
+분류 결과를 `refs/ux-research/` 8종에 반영한다. **단일 source 규약**(README) 준수 — 페르소나/여정/시나리오는
+PERSONA.md / USER_JOURNEY_MAP.md / USER_SCENARIOS.md 에서만 정의하고 하위 스킬은 읽기만 한다.
 
 | 파일 | 주입 내용 |
 |---|---|
 | `PERSONA.md` | P1/P2/P3 항목별 신뢰도 + 실증 링크 + 표본 한계. 강등 시 사유 명시 |
-| `USER_JOURNEY_MAP.md` | 단계별 이탈 위험에 신뢰도 컬럼 + 근거 인용 |
+| `USER_JOURNEY_MAP.md` | **(Step 3.5에서 '예'인 경우만)** 단계별 이탈 위험에 신뢰도 컬럼 + 근거 인용. '아니오'면 N/A 표기 |
+| `USER_SCENARIOS.md` | 페르소나별 과업의 목표·성공조건(측정 가능). 여정맵 N/A 시에도 **필수** |
 | `USER_RESEARCH.md` | "실증 데이터 출처" 섹션(S1·S2…) + 가설 H{n} 상태 갱신 + 마일스톤 |
 | `INTERVIEW_GUIDE.md` | 수집 인프라(넥슨퍼스트 패널 등) + Findings를 인터뷰 주제 시드로 |
 | `INTERVIEW_NOTES.md` | 1차/인접 참조(REF-*) — 유저보이스 원문 + 출처 링크 보존 |
