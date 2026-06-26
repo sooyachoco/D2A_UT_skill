@@ -54,9 +54,34 @@ function Copy-One($rel) {
 foreach ($item in $overlay) { Copy-One $item }
 
 Write-Host ""
-Write-Host "✅ 파일 복사 완료. 아래 2가지 수동 단계를 마저 진행하세요:"
+Write-Host "✅ 파일 복사 완료."
+
+# task-validator.ts 를 덮어썼으므로 MCP 를 재빌드해 ut: 게이트를 반영한다.
+$McpDir = Join-Path $Dest "d2a-mcp-server"
 Write-Host ""
-Write-Host "[1] CLAUDE.md 스킬 표에 4종 등록 (ux-audit / ux-research-sync / ui-design-workflow / ai-usability-test)"
-Write-Host "[2] MCP 재빌드: cd d2a-mcp-server; npm install; npm run build  (dist/ 에 checkUtReport 반영 확인)"
+Write-Host "→ MCP 재빌드 (ut: 게이트 활성화)…"
+$npm = Get-Command npm -ErrorAction SilentlyContinue
+if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
+  try {
+    Push-Location $McpDir
+    npm install --silent
+    npm run build --silent
+    Pop-Location
+    if (Get-ChildItem -Recurse (Join-Path $McpDir "dist") -ErrorAction SilentlyContinue | Select-String -Quiet "checkUtReport") {
+      Write-Host "  ✓ MCP 빌드 완료 — ut: 게이트 활성"
+    } else {
+      Write-Host "  ⚠️  빌드는 됐으나 dist 에 checkUtReport 미검출 — 수동 확인 필요"
+    }
+  } catch {
+    Pop-Location -ErrorAction SilentlyContinue
+    Write-Host "  ⚠️  MCP 빌드 실패 — 수동 실행: cd '$McpDir'; npm install; npm run build"
+  }
+} else {
+  Write-Host "  ⚠️  npm 미설치 또는 d2a-mcp-server 부재 — 나중에 수동: cd '$McpDir'; npm install; npm run build"
+}
+
+Write-Host ""
+Write-Host "남은 수동 1단계:"
+Write-Host "[*] CLAUDE.md 스킬 표에 4종 등록 (ux-audit / ux-research-sync / ui-design-workflow / ai-usability-test)"
 Write-Host ""
 Write-Host "자세한 병합 판정·매핑은 INTEGRATION.md 참조."

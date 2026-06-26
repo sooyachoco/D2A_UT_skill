@@ -103,9 +103,12 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 ```
 
 설치기는 신규 파일을 복사하고 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은
-`.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. 끝나면 콘솔이 남은 2단계를 안내한다:
+`.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:` 게이트 활성화를 위해 MCP 를 자동 재빌드**한다
+(`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내). 끝나면 콘솔이 남은 1단계를 안내한다:
 1. `CLAUDE.md` 스킬 표에 4종(`ux-audit`/`ux-research-sync`/`ui-design-workflow`/`ai-usability-test`) 등록
-2. `cd d2a-mcp-server && npm install && npm run build` 로 `ut:` 게이트 활성화
+
+> MCP 빌드는 보일러플레이트 초기 셋업의 빌드와 동일한 작업이다. 설치기가 덮어쓴 직후 자동 재실행해
+> 구버전 `dist/` 가 남지 않도록 보장한다(`ut:` 게이트가 조용히 죽는 것을 방지).
 
 > 파일별 병합 판정(상위호환/동일)·경로 매핑 상세는 [`INTEGRATION.md`](INTEGRATION.md) 참조.
 

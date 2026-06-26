@@ -59,19 +59,37 @@ copy_one() {
 
 for item in "${OVERLAY[@]}"; do copy_one "$item"; done
 
+echo ""
+echo "✅ 파일 복사 완료."
+
+# task-validator.ts 를 덮어썼으므로 MCP 를 재빌드해 ut: 게이트를 반영한다.
+# (보일러플레이트의 dist/ 는 구버전이라 자동 재빌드가 필수다.)
+MCP_DIR="$DEST/d2a-mcp-server"
+echo ""
+echo "→ MCP 재빌드 (ut: 게이트 활성화)…"
+if command -v npm >/dev/null 2>&1 && [ -f "$MCP_DIR/package.json" ]; then
+  if ( cd "$MCP_DIR" && npm install --silent && npm run build --silent ); then
+    if grep -rlq "checkUtReport" "$MCP_DIR/dist" 2>/dev/null; then
+      echo "  ✓ MCP 빌드 완료 — ut: 게이트 활성"
+    else
+      echo "  ⚠️  빌드는 됐으나 dist 에 checkUtReport 미검출 — 수동 확인 필요"
+    fi
+  else
+    echo "  ⚠️  MCP 빌드 실패 — 수동 실행: (cd \"$MCP_DIR\" && npm install && npm run build)"
+  fi
+else
+  echo "  ⚠️  npm 미설치 또는 d2a-mcp-server 부재 — 나중에 수동 빌드:"
+  echo "      (cd \"$MCP_DIR\" && npm install && npm run build)"
+fi
+
 cat <<'EOF'
 
-✅ 파일 복사 완료. 아래 2가지 수동 단계를 마저 진행하세요:
-
-[1] CLAUDE.md 스킬 표에 4종 등록 (미등록 시 자동 호출 안 됨)
+남은 수동 1단계:
+[*] CLAUDE.md 스킬 표에 4종 등록 (미등록 시 자동 호출 안 됨)
     | `/ux-audit`          | 구현 전 UX 진단 (7가지 휴리스틱 렌즈 — advisory) |
     | `/ux-research-sync`  | 외부 리서치 데이터를 refs/ux-research SSOT에 적재 |
     | `/ui-design-workflow`| PRD→게이트0→3안 발산→락→상태설계→핸드오프 |
     | `/ai-usability-test` | Playwright 3 페르소나 자동 사용성 테스트 |
-
-[2] MCP 서버 재빌드 (ut: 게이트 활성화)
-    cd d2a-mcp-server && npm install && npm run build
-    grep -rl checkUtReport dist/   # dist/tools/task-validator.js 나오면 OK
 
 자세한 병합 판정·매핑은 INTEGRATION.md 참조.
 EOF
