@@ -86,6 +86,10 @@ done:
 | S2 Minor | 우회 가능 | 백로그 |
 | S1 Cosmetic | 소소한 개선 | 여유 시 처리 |
 
+## 통합
+
+본체(`d2a-boilerplate-claude`)에 병합하는 검증된 절차는 [`INTEGRATION.md`](INTEGRATION.md) 참조 — 신규 6건 / 충돌 4건의 diff 판정(모두 상위호환), CLAUDE.md 등록 스니펫, `dist/` 재빌드 절차를 담았다.
+
 ## 비고
 
 - 본 묶음은 D2A 보일러플레이트 본체에서 발췌한 것으로, 단독 실행보다는 본체 구조(`.claude/`, `d2a-mcp-server/`, `refs/`) 안에 배치해 사용하는 것을 전제로 한다.
