@@ -27,7 +27,7 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 |---|---|
 | `ux-audit.md` | **PRD·플로우·와이어프레임 사전 진단(shift-left).** 7개 UX 렌즈(플로우·인증·결제·에러복구·멘탈모델·빈상태·피드백) 휴리스틱으로 공백을 하나씩 질문해 잡는다. 코드 작성 전 단계, 자문형(점수·게이트 없음) |
 | `ai-usability-test.md` | Playwright + 3페르소나(초보/파워/접근성) + Nielsen 휴리스틱 자동 사용성 테스트. 산출물 5종 생성, MCP `ut:` done 기준 |
-| `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 7종 주입. 단일 source 공급 |
+| `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 8종 주입. 단일 source 공급 |
 | `ui-design-workflow.md` | PRD→0단계 게이트→3안 발산→확정 락→상태설계→자가점검→0-드리프트 전사→AI UT 게이트 |
 | `create-spec.md` | spec/plan/tasks 생성. Step 0.5(리서치 로드) + Step 2.7.5(AI UT 자동 게이트) 포함 |
 | `pre-launch-check.md` | 배포 전 검증 체크리스트 (UT_FINDINGS_REPORT 갈음 규칙 연동) |
@@ -42,7 +42,7 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 
 페르소나·여정을 한 곳에서만 정의하는 SSOT. 검증 스킬은 **읽기만** 한다.
 
-> ⚠️ **템플릿(빈) 상태로 배포된다.** 9종 모두 구조·규약만 갖춘 골격이며 실데이터는 비어 있다.
+> ⚠️ **템플릿(빈) 상태로 배포된다.** 10종 모두 구조·규약만 갖춘 골격이며 실데이터는 비어 있다.
 > **프로젝트 시작 시 `ux-research-sync 실행해줘`** 로 대상 서비스의 실제 리서치 데이터(MCP/Notion 등)를
 > 신뢰도 등급과 함께 주입해 채운다. 채우기 전에는 전 항목 🔵 가설이며 UT 결과는 "가정 기반"으로 표기된다.
 
@@ -51,6 +51,7 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 | `README.md` | 단일 source 규약 + 신뢰도 3단계 체계 |
 | `PERSONA.md` ⭐ | P1 신규 / P2 헤비·도네이터 / P3 접근성 — UT 시뮬레이션 매핑 |
 | `USER_JOURNEY_MAP.md` ⭐ | 유입~이탈 5단계 + 이탈 지점 |
+| `USER_SCENARIOS.md` ⭐ | 페르소나별 과업 목표·성공조건 (상류 레이어 — UT가 read-only로 소비) |
 | `USER_RESEARCH.md` | 가설·방법론·마일스톤 |
 | `INTERVIEW_GUIDE.md` | AI 인터뷰어 작동 경계 (CAR 구조) |
 | `INTERVIEW_NOTES.md` | 전사+요약+타임코드 템플릿 |
@@ -89,5 +90,5 @@ done:
 ## 비고
 
 - 본 묶음은 D2A 보일러플레이트 본체에서 발췌한 것으로, 단독 실행보다는 본체 구조(`.claude/`, `d2a-mcp-server/`, `refs/`) 안에 배치해 사용하는 것을 전제로 한다.
-- `refs/ux-research/` 9종은 **빈 템플릿**으로 배포된다. 특정 서비스의 실데이터는 포함하지 않으며, `ux-research-sync` 스킬이 프로젝트 시작 시 실제 리서치 데이터로 채운다.
+- `refs/ux-research/` 10종은 **빈 템플릿**으로 배포된다. 특정 서비스의 실데이터는 포함하지 않으며, `ux-research-sync` 스킬이 프로젝트 시작 시 실제 리서치 데이터로 채운다.
 - `ux-audit.md` 는 replatform-playground/ux-audit-skill(v2.2.0)에서 도입했다. 범용 번들에 맞춰 **Step 2.5만 완화**(사내 `gamescale-expert` 하드 의존 → "사내 표준 스킬 있으면 참조, 없으면 업계 표준") 했고, 7개 렌즈 분석 본문은 원문 그대로다.
