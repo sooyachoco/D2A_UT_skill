@@ -35,7 +35,7 @@
 
 ```markdown
 | `/write-scenario` | PRD→흐름 strawman 사용자 확정→페르소나별 과업 시나리오→잠정 화면 후보 → scenario.md |
-| `/reference-proposal` | 화면설계 전 레퍼런스 제안→선택 (톤 북극성 1개 + 화면별 인터랙션 레퍼런스) → reference-board.md |
+| `/reference-proposal` | 화면설계 전 레퍼런스 제안→선택 (기준 톤 1개 + 화면별 인터랙션 레퍼런스) → reference-board.md |
 | `/ux-audit` | 구현 전 UX 진단 (7가지 휴리스틱 렌즈 — advisory) |
 | `/ux-research-sync` | 외부 리서치 데이터를 refs/ux-research SSOT에 적재 (3단계 신뢰도) |
 | `/ui-design-workflow` | PRD→게이트0→3안 발산→락→상태설계→무드리프트 핸드오프 |

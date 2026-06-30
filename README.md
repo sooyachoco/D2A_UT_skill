@@ -29,7 +29,7 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 | `ai-usability-test.md` | Playwright + 3페르소나(초보/파워/접근성) + Nielsen 휴리스틱 자동 사용성 테스트. 산출물 5종 생성, MCP `ut:` done 기준 |
 | `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 8종 주입. 단일 source 공급 |
 | `write-scenario.md` | **(상류·신규)** PRD→흐름 strawman 사용자 확정(AI 추측 금지)→페르소나별 과업 시나리오→잠정 화면 후보. 커버리지까지만 책임, 충실도는 ui-design-workflow에 위임. 산출 `scenario.md` |
-| `reference-proposal.md` | **(상류·신규)** 화면설계 전 레퍼런스를 AI가 제안→사용자 선택. 톤 북극성 1개 + 화면별 인터랙션 레퍼런스(키스톤). 산출 `reference-board.md` |
+| `reference-proposal.md` | **(상류·신규)** 화면설계 전 레퍼런스를 AI가 제안→사용자 선택. 기준 톤 1개 + 화면별 인터랙션 레퍼런스(키스톤). 산출 `reference-board.md` |
 | `ui-design-workflow.md` | PRD→0단계 게이트→3안 발산→확정 락→상태설계→자가점검→0-드리프트 전사→AI UT 게이트. STEP 1이 `scenario.md`를 소비(흐름 재확정 생략) |
 | `create-spec.md` | spec/plan/tasks 생성. Step 0.5(리서치 로드) + Step 2.7.5(AI UT 자동 게이트) 포함 |
 | `pre-launch-check.md` | 배포 전 검증 체크리스트 (UT_FINDINGS_REPORT 갈음 규칙 연동) |
