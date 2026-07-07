@@ -19,6 +19,44 @@ D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본
 사람이 눈으로 보던 UX 검수를, **코드가 숫자로 검사해 자동으로 막는 강제 게이트**로 전환한 묶음이다.
 상류(리서치)와 하류(검증)는 페르소나·여정을 **한 곳에서만 정의**해 drift(정의 중복)를 제거한다.
 
+## 🔧 보일러플레이트 엔진과 병합 셋업
+
+이 번들은 **단독 실행용이 아니라** D2A 보일러플레이트(엔진, `d2a-boilerplate-claude`) 위에 얹는 **오버레이**다.
+아래 5스텝이면 엔진에 병합되어 스킬 18종 → **25종** + UX 리서치 SSOT + `ut:` 강제 게이트가 활성화된다.
+
+```bash
+# 0) 엔진(보일러플레이트) 준비 — 없으면 먼저 설치
+#    새 프로젝트에서 'd2a-installer 실행해줘' 로 d2a-boilerplate-claude 를 받는다.
+#    (사내: gitlab.nexon.com/frontdev/inhouse/replatform-playground/d2a-boilerplate-claude)
+
+# 1) 이 번들 클론
+git clone https://github.com/sooyachoco/D2A_UXUI_skill.git && cd D2A_UXUI_skill
+
+# 2) 엔진에 병합 설치 (template/ 로 오버레이 복사, 충돌 파일은 .bak 백업)
+bash install.sh <d2a-boilerplate-claude 경로>            # macOS/Linux/Git Bash
+#  또는
+pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
+```
+
+**설치기가 자동으로 하는 것**
+1. 신규 파일 복사 — UX/UI 스킬(`write-scenario`·`reference-proposal`·`ux-audit`·`ux-research-sync`·`ui-design-workflow`·`ai-usability-test`·`design-handoff`) + `refs/ux-research/`(SSOT 10종) + `frontend/tests/ut/run-ut.mjs` + `accessibility` 서브에이전트
+2. 충돌 파일 덮어쓰기(상위호환) — `create-spec.md`·`pre-launch-check.md`·`task-validator.ts` (기존은 `.bak-<timestamp>` 백업)
+3. **MCP 자동 재빌드** — `task-validator.ts` 를 덮어썼으므로 `d2a-mcp-server` 를 `npm install && npm run build` 재빌드해 **`ut:` 게이트를 활성화**(구버전 `dist/` 가 게이트를 조용히 죽이는 것 방지)
+
+**남은 수동 2스텝 (병합 후 정합성)**
+4. `CLAUDE.md` **스킬 표에 7종 등록** + 스킬 수 표기 **18개 → 25개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공)
+5. 프로젝트 시작 시 **`ux-research-sync 실행해줘`** 로 SSOT(페르소나·여정·과업)를 실제 데이터로 채움 (채우기 전엔 전 항목 🔵 가설)
+
+**병합 검증 (선택)**
+```bash
+ls .claude/skills | wc -l                                  # 25
+grep -c 'ut:' d2a-mcp-server/src/tools/task-validator.ts   # >0 (게이트 존재)
+grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
+```
+
+> 파일별 병합 판정(상위호환/동일)·경로 매핑·CLAUDE.md 등록 스니펫 상세는 [`INTEGRATION.md`](INTEGRATION.md) 참조.
+> 병합이 끝나면 파이프라인은 `write-scenario → reference-proposal → ui-design-workflow → create-spec(코딩) → ai-usability-test → design-handoff → run-phase(ut: 게이트)` 로 흐른다.
+
 ## 구성
 
 ### 1. 스킬 (`.claude/skills/`)
