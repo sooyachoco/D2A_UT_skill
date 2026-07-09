@@ -119,7 +119,7 @@ done:
 ```
 
 `submit_task` 시 리포트의 `ut-metrics` 주석(또는 폴백으로 Executive Summary 표)에서 지표를 추출해 임계 규칙을 평가한다:
-S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`visual`) · 런타임 오류(`console`) · 네트워크 오류(`net`) · 성능(`lcp` ms, `cls` = CLS×1000) · flaky 격리 수(`flaky`).
+S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`visual`) · 런타임 오류(`console`) · 네트워크 오류(`net`) · 성능(`lcp` ms, `cls` = CLS×1000) · flaky 격리 수(`flaky`) · 기능 커버리지(`coverage` %, spec F-xx 대비).
 실패 시나리오는 `retries`(기본 1) 재시도 후 회복되면 flaky로 격리해 결함·게이트에서 제외한다(오탐 방지).
 리포트 부재·지표 미검출 시 **실패 처리**(UT 미실행을 통과로 오인 방지).
 

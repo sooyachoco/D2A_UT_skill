@@ -100,6 +100,14 @@ async function main() {
   for (const r of all) if (r.flaky) flakyKeys.set(`${r.persona}/${r.scenario}`, r.attempts || 2);
   const flakyCount = flakyKeys.size;
 
+  // 커버리지: spec.md 기능정의(F-xx) 대비 UT 시나리오가 덮은 비율 (Step 1.5)
+  // config.features = UT가 덮어야 할 UI 기능 목록(분모). 미선언 시 미측정.
+  const features = Array.isArray(cfg.features) ? cfg.features.map(String) : [];
+  const coveredSet = new Set();
+  for (const r of all) for (const f of (r.covers || [])) coveredSet.add(String(f));
+  const uncovered = features.filter((f) => !coveredSet.has(f));
+  const coveragePct = features.length ? Math.round(((features.length - uncovered.length) / features.length) * 100) : null;
+
   // Severity 카운트 (기능 결함 + WCAG 위반 통합)
   const counts = { S4: 0, S3: 0, S2: 0, S1: 0 };
   const findings = [];
@@ -224,7 +232,8 @@ async function main() {
   findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
 
   const blocker = counts.S4 > 0 ? `⛔ 배포 블로커 (S4 ${counts.S4}건)` : '✅ 배포 블로커 없음';
-  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric} flaky=${flakyCount}`;
+  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric} flaky=${flakyCount}`
+    + (coveragePct !== null ? ` coverage=${coveragePct}` : '');
 
   const md = [];
   md.push(`# UT_FINDINGS_REPORT — ${path.basename(path.dirname(specDir)) || '프로젝트'}`);
@@ -258,6 +267,10 @@ async function main() {
     : (perfSkipped ? '수집 실패' : '수집 안 됨 (config.perf=false)');
   md.push(`- **성능(Core Web Vitals)**: ${perfLine}`);
   md.push(`- **flaky(재시도 후 회복·격리)**: ${flakyCount}건${flakyCount ? ' — 결함 카운트 제외, 아래 격리 섹션 참조' : ''}`);
+  const coverageLine = coveragePct === null
+    ? '미측정 (`ut.config.mjs`에 `features: [F-xx…]` 미선언)'
+    : `${coveragePct}% (${features.length - uncovered.length}/${features.length} 기능)${uncovered.length ? ` — 미커버 ${uncovered.length}건` : ''}`;
+  md.push(`- **기능 커버리지(spec F-xx)**: ${coverageLine}`);
   md.push(`- **배포 판정**: ${blocker}`);
   md.push('');
   md.push('## 결함 목록 (심각도 순)');
@@ -275,6 +288,15 @@ async function main() {
       if (f.screenshot) md.push(`- **스크린샷**: ${f.screenshot}`);
       md.push('');
     });
+  }
+
+  if (uncovered.length > 0) {
+    md.push('## 미커버 기능(F-xx) — UT 시나리오 없음');
+    md.push('');
+    md.push('아래 기능은 spec.md에 정의됐으나 대응 UT 시나리오가 없다. **결함이 아니라 검증 공백**이다 — `ut.config.mjs` 시나리오에 `covers`로 연결하거나 시나리오를 추가한다.');
+    md.push('');
+    for (const f of uncovered) md.push(`- \`${f}\``);
+    md.push('');
   }
 
   if (flakyCount > 0) {

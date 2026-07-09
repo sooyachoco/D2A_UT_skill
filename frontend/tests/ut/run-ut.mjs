@@ -133,7 +133,7 @@ async function main() {
     let maxHesitation = 0;
 
     const rec = (partial) => {
-      recs.push({ persona: personaId, scenario: scenario.id, title: scenario.title, timestamp: Date.now(), durationMs: Date.now() - t0, ...partial });
+      recs.push({ persona: personaId, scenario: scenario.id, title: scenario.title, covers: scenario.covers || [], timestamp: Date.now(), durationMs: Date.now() - t0, ...partial });
       if (typeof partial.hesitationMs === 'number') maxHesitation = Math.max(maxHesitation, partial.hesitationMs);
     };
     const shot = async (name) => {

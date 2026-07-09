@@ -43,10 +43,16 @@ export default {
   //   예: personas: ['beginner', 'power-user', 'accessibility', 'tablet']
   personas: ['beginner', 'power-user', 'accessibility'],
 
+  // 커버리지(Step 1.5) — UT가 덮어야 할 UI 기능(spec.md F-xx) 목록. 각 scenario의 covers와 대조해
+  // 미커버 F-xx를 경고하고 coverage(%) 지표를 산출한다. 미선언 시 커버리지 미측정.
+  //   게이트 예: ut: .../UT_FINDINGS_REPORT.md :: S4=0,coverage>=100
+  features: ['F-01', 'F-02'],
+
   scenarios: [
     {
       id: 'S-01',
       title: '메인에서 상세로 진입',
+      covers: ['F-01'],        // 이 시나리오가 덮는 spec.md 기능 (커버리지 산출용)
       // a11y: false,          // 이 시나리오만 접근성 스캔 끄기
       async run({ persona, goto, rec, shot, page }) {
         await goto('/');
@@ -70,6 +76,7 @@ export default {
     {
       id: 'S-02',
       title: '핵심 행동(후원/제출) 키보드 도달성',
+      covers: ['F-02'],
       personas: ['accessibility'],   // 접근성 페르소나만 실행하는 예시
       async run({ persona, goto, rec, shot }) {
         await goto('/detail/1');

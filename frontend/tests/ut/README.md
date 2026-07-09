@@ -71,6 +71,7 @@ node frontend/tests/ut/ut-aggregate.mjs
 | `lcp` | 최악 LCP(ms) |
 | `cls` | 최악 CLS×1000 (0.1 → 100) — 게이트는 정수만 파싱하므로 ×1000 |
 | `flaky` | 재시도 후 회복돼 격리된 케이스 수 (결함 카운트 제외) |
+| `coverage` | spec.md UI 기능(F-xx) 중 UT 시나리오가 덮은 비율(%) — `config.features` 선언 시에만 |
 
 `tasks.md` 의 `done` 에서 임계로 건다:
 
