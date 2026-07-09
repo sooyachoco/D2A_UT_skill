@@ -21,7 +21,7 @@
 - **성능**: LCP/CLS 예산 초과 (poor→S3, 개선필요→S2)
 - **시각적 회귀**: baseline 대비 diff (≥15%→S3, 그 외→S2)
 
-노이즈(서드파티·애널리틱스 등)는 `ut.config.mjs` 의 `ignoreConsole`/`ignoreNetwork` 로 걸러낸다.
+**안정성(오탐 방지)** — 실패한 시나리오는 `retries`(기본 1)만큼 재시도한다. 재시도에서 회복되면 **flaky로 격리**해 결함 카운트·게이트에서 제외하고 리포트에 별도 표기한다(일시적 500·타이밍 오탐 방지). HMR·Fast Refresh·Vite·DevTools·favicon 등 프레임워크 잡음은 기본 노이즈 필터로 제외(`noiseFilters:false`로 끔). 추가 제외는 `ignoreConsole`/`ignoreNetwork`.
 
 `mobile`/`tablet` 은 `refs/ux-research/PERSONA.md` SSOT(P1~P3)가 아니라 **뷰포트·터치 입력이라는 디바이스 차원**을 얹은 선택적 프로파일이다. 기본 personas 목록엔 없고, 시나리오의 `personas: [...]`에 `'mobile'`/`'tablet'`을 명시해야 실행된다. `tablet`(810×1080)은 사이드바 접힘 등 반응형 브레이크포인트 전환 구간을 확인하는 용도다.
 
@@ -70,6 +70,7 @@ node frontend/tests/ut/ut-aggregate.mjs
 | `net` | 네트워크 실패(4xx/5xx·요청실패) 고유 건수 |
 | `lcp` | 최악 LCP(ms) |
 | `cls` | 최악 CLS×1000 (0.1 → 100) — 게이트는 정수만 파싱하므로 ×1000 |
+| `flaky` | 재시도 후 회복돼 격리된 케이스 수 (결함 카운트 제외) |
 
 `tasks.md` 의 `done` 에서 임계로 건다:
 

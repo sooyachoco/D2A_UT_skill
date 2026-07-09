@@ -7,6 +7,12 @@
 //   UT_BASE=https://local-app.nexon.com node frontend/tests/ut/run-ut.mjs
 //   UT_CONFIG=frontend/tests/ut/ut.config.mjs node frontend/tests/ut/run-ut.mjs
 //
+// 안정성:
+//   · flaky 재시도 게이트 — 실패한 시나리오를 재실행(config.retries, 기본 1). 재시도에서 회복되면
+//     "flaky"로 격리(결함 카운트 제외), 지속 실패하면 reproducible 결함으로 확정.
+//   · 노이즈 필터 — HMR·Fast Refresh·Vite·DevTools·favicon 등 프레임워크 잡음을 기본 제외
+//     (config.noiseFilters=false 로 끔). config.ignoreConsole/ignoreNetwork 로 추가.
+//
 // 산출: {specDir}/observations/raw-observations.json + {specDir}/screenshots/*.png
 // 이후 `node frontend/tests/ut/ut-aggregate.mjs` 로 UT_FINDINGS_REPORT.md 를 집계한다.
 
@@ -24,6 +30,16 @@ class AuthRedirectError extends Error {}
 
 const toRe = (p) => (p instanceof RegExp ? p : new RegExp(p));
 const ignoredBy = (patterns, text) => patterns.some((p) => toRe(p).test(text));
+
+// 프레임워크·개발서버 잡음(결함 아님). auto-acceptance 노이즈 필터와 동일 취지.
+const DEFAULT_CONSOLE_IGNORE = [
+  /\[Fast Refresh\]/i, /\[HMR\]/i, /\[vite\]/i,
+  /Download the React DevTools/i, /React DevTools/i,
+  /failed to load source map/i,
+];
+const DEFAULT_NETWORK_IGNORE = [
+  /\/favicon\.ico(\?|$)/i, /\/@vite\//, /\/@react-refresh/, /hot-update\.(js|json)/,
+];
 
 // ── 설정 로드 ────────────────────────────────────────────────
 async function loadConfig() {
@@ -59,10 +75,11 @@ async function main() {
   const useAuth = authState && fs.existsSync(authState);
   const guardHosts = config.authGuardHosts || ['signin.nexon.com', 'nxas.nexon.com'];
   const defaultPersonas = config.personas || ['beginner', 'power-user', 'accessibility'];
-  // 노이즈(서드파티 스크립트·favicon 404·애널리틱스 등) 제외 패턴. 문자열/RegExp 모두 허용.
-  const ignoreConsole = config.ignoreConsole || [];
-  const ignoreNetwork = config.ignoreNetwork || [];
-  const collectPerf = config.perf !== false; // 기본 활성, config.perf===false 로 끔
+  const useNoise = config.noiseFilters !== false;
+  const ignoreConsole = [...(useNoise ? DEFAULT_CONSOLE_IGNORE : []), ...(config.ignoreConsole || [])];
+  const ignoreNetwork = [...(useNoise ? DEFAULT_NETWORK_IGNORE : []), ...(config.ignoreNetwork || [])];
+  const collectPerf = config.perf !== false;
+  const retries = Number.isInteger(config.retries) ? Math.max(0, config.retries) : 1;
 
   const results = [];
   const consoleErrors = [];
@@ -70,131 +87,135 @@ async function main() {
 
   const browser = await chromium.launch();
 
+  // 시나리오×페르소나 1회 실행(= 1 attempt). 격리된 컨텍스트에서 관측을 로컬 버퍼에 모아 반환.
+  async function runAttempt(scenario, personaId, attempt) {
+    const profile = PERSONA_PROFILES[personaId] || {};
+    const ctx = await browser.newContext({
+      viewport: profile.viewport || { width: 1440, height: 900 },
+      isMobile: !!profile.isMobile,
+      hasTouch: !!profile.hasTouch,
+      deviceScaleFactor: profile.deviceScaleFactor || 1,
+      storageState: useAuth ? authState : undefined,
+    });
+    const page = await ctx.newPage();
+    if (collectPerf) await page.addInitScript(PERF_INIT_SCRIPT);
+
+    const recs = [];
+    const consoleErrs = [];
+    const netErrs = [];
+
+    page.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      const text = m.text();
+      if (ignoredBy(ignoreConsole, text)) return;
+      consoleErrs.push({ persona: personaId, scenario: scenario.id, type: 'console', text });
+    });
+    page.on('pageerror', (e) => {
+      const text = e.message || String(e);
+      if (ignoredBy(ignoreConsole, text)) return;
+      consoleErrs.push({ persona: personaId, scenario: scenario.id, type: 'pageerror', text });
+    });
+    page.on('response', (resp) => {
+      const status = resp.status();
+      if (status < 400) return;
+      const url = resp.url();
+      if (ignoredBy(ignoreNetwork, url)) return;
+      netErrs.push({ persona: personaId, scenario: scenario.id, kind: 'status', status, method: resp.request().method(), url });
+    });
+    page.on('requestfailed', (req) => {
+      const url = req.url();
+      if (ignoredBy(ignoreNetwork, url)) return;
+      netErrs.push({ persona: personaId, scenario: scenario.id, kind: 'failed', status: 0, method: req.method(), url, failure: req.failure()?.errorText || '' });
+    });
+
+    const persona = makePersona(page, personaId);
+    const t0 = Date.now();
+    let maxHesitation = 0;
+
+    const rec = (partial) => {
+      recs.push({ persona: personaId, scenario: scenario.id, title: scenario.title, timestamp: Date.now(), durationMs: Date.now() - t0, ...partial });
+      if (typeof partial.hesitationMs === 'number') maxHesitation = Math.max(maxHesitation, partial.hesitationMs);
+    };
+    const shot = async (name) => {
+      const p = path.join(shotsDir, `${personaId}-${scenario.id}-${name}.png`);
+      await page.screenshot({ path: p }).catch(() => {});
+      return path.relative(ROOT, p).replace(/\\/g, '/');
+    };
+    const goto = async (relOrAbs, opts) => {
+      const url = /^https?:\/\//.test(relOrAbs) ? relOrAbs : base + (relOrAbs.startsWith('/') ? '' : '/') + relOrAbs;
+      await persona.goto(url, opts);
+      const host = new URL(page.url()).host;
+      if (guardHosts.some((h) => host.includes(h))) {
+        throw new AuthRedirectError(`인증 화면으로 리다이렉트됨(${host}) — storageState 만료. save-auth-state 재실행 필요`);
+      }
+    };
+
+    let abortedByAuth = false;
+    try {
+      await scenario.run({ page, persona, base, rec, shot, goto, config, root: ROOT });
+    } catch (e) {
+      const isAuth = e instanceof AuthRedirectError;
+      abortedByAuth = isAuth;
+      rec({
+        action: 'scenario-run', completed: false, isError: true,
+        errorType: isAuth ? 'auth-redirect' : 'exception',
+        severityHint: isAuth ? 'S4' : undefined,
+        hesitationMs: maxHesitation, screenshotPath: await shot('error'), note: e.message,
+      });
+    }
+
+    if (!abortedByAuth && scenario.a11y !== false) {
+      const a = await scanA11y(page, scenario.a11yOptions);
+      rec({
+        action: 'a11y-axe-scan', completed: !a.skipped && a.counts.total === 0, isError: false, errorType: null,
+        a11y: a.skipped ? { skipped: true, reason: a.reason } : a.counts,
+        ariaIssue: a.skipped ? a.reason : (a.violations.map((v) => `${v.id}(${v.severity}×${v.nodes})`).join(', ') || null),
+        violations: a.violations,
+        note: a.skipped ? `axe 스킵: ${a.reason}` : `WCAG 위반 ${a.counts.total}건 (S4:${a.counts.S4}/S3:${a.counts.S3}/S2:${a.counts.S2}/S1:${a.counts.S1})`,
+      });
+    }
+    if (!abortedByAuth && collectPerf) {
+      const perf = await readPerf(page);
+      rec({
+        action: 'perf-metrics', completed: perf.ok, isError: false, errorType: null,
+        perf: perf.ok ? { lcp: perf.lcp, cls: perf.cls, fcp: perf.fcp, load: perf.load, ttfb: perf.ttfb } : { skipped: true, reason: perf.reason },
+        note: perf.ok ? `LCP ${perf.lcp}ms · CLS ${perf.cls} · FCP ${perf.fcp}ms · load ${perf.load}ms` : `perf 수집 실패: ${perf.reason}`,
+      });
+    }
+
+    await ctx.close();
+
+    // 이 attempt 를 "실패"로 볼지: 기능 오류(isError) · 잡히지 않은 예외 · 5xx/요청실패.
+    // 4xx 단독(리소스 404 등)은 결정적이라 재시도 트리거로 보지 않는다.
+    const failed = recs.some((r) => r.isError)
+      || consoleErrs.some((c) => c.type === 'pageerror')
+      || netErrs.some((n) => n.kind === 'failed' || n.status >= 500);
+
+    return { recs, consoleErrs, netErrs, failed, abortedByAuth, attempt };
+  }
+
   for (const scenario of config.scenarios || []) {
     const personas = scenario.personas || defaultPersonas;
     for (const personaId of personas) {
-      const profile = PERSONA_PROFILES[personaId] || {};
-      const ctx = await browser.newContext({
-        viewport: profile.viewport || { width: 1440, height: 900 },
-        isMobile: !!profile.isMobile,
-        hasTouch: !!profile.hasTouch,
-        deviceScaleFactor: profile.deviceScaleFactor || 1,
-        storageState: useAuth ? authState : undefined,
-      });
-      const page = await ctx.newPage();
-      if (collectPerf) await page.addInitScript(PERF_INIT_SCRIPT);
-
-      // 콘솔 error 로그 캡처 (ignore 패턴 제외)
-      page.on('console', (m) => {
-        if (m.type() !== 'error') return;
-        const text = m.text();
-        if (ignoredBy(ignoreConsole, text)) return;
-        consoleErrors.push({ persona: personaId, scenario: scenario.id, type: 'console', text });
-      });
-      // 잡히지 않은 런타임 예외 캡처 (console.error 보다 강한 신호)
-      page.on('pageerror', (e) => {
-        const text = e.message || String(e);
-        if (ignoredBy(ignoreConsole, text)) return;
-        consoleErrors.push({ persona: personaId, scenario: scenario.id, type: 'pageerror', text });
-      });
-      // 실패 응답(4xx/5xx) 캡처
-      page.on('response', (resp) => {
-        const status = resp.status();
-        if (status < 400) return;
-        const url = resp.url();
-        if (ignoredBy(ignoreNetwork, url)) return;
-        networkErrors.push({ persona: personaId, scenario: scenario.id, kind: 'status', status, method: resp.request().method(), url });
-      });
-      // 네트워크 자체 실패(DNS·차단·CORS 등)
-      page.on('requestfailed', (req) => {
-        const url = req.url();
-        if (ignoredBy(ignoreNetwork, url)) return;
-        networkErrors.push({ persona: personaId, scenario: scenario.id, kind: 'failed', status: 0, method: req.method(), url, failure: req.failure()?.errorText || '' });
-      });
-
-      const persona = makePersona(page, personaId);
-      const t0 = Date.now();
-      let maxHesitation = 0;
-
-      const rec = (partial) => {
-        results.push({
-          persona: personaId,
-          scenario: scenario.id,
-          title: scenario.title,
-          timestamp: Date.now(),
-          durationMs: Date.now() - t0,
-          ...partial,
-        });
-        if (typeof partial.hesitationMs === 'number') maxHesitation = Math.max(maxHesitation, partial.hesitationMs);
-      };
-
-      const shot = async (name) => {
-        const p = path.join(shotsDir, `${personaId}-${scenario.id}-${name}.png`);
-        await page.screenshot({ path: p }).catch(() => {});
-        return path.relative(ROOT, p).replace(/\\/g, '/');
-      };
-
-      // auth 리다이렉트 가드가 붙은 goto
-      const goto = async (relOrAbs, opts) => {
-        const url = /^https?:\/\//.test(relOrAbs) ? relOrAbs : base + (relOrAbs.startsWith('/') ? '' : '/') + relOrAbs;
-        await persona.goto(url, opts);
-        const host = new URL(page.url()).host;
-        if (guardHosts.some((h) => host.includes(h))) {
-          throw new AuthRedirectError(`인증 화면으로 리다이렉트됨(${host}) — storageState 만료. save-auth-state 재실행 필요`);
-        }
-      };
-
-      const scenarioCtx = { page, persona, base, rec, shot, goto, config, root: ROOT };
-
-      try {
-        await scenario.run(scenarioCtx);
-      } catch (e) {
-        const isAuth = e instanceof AuthRedirectError;
-        rec({
-          action: 'scenario-run',
-          completed: false,
-          isError: true,
-          errorType: isAuth ? 'auth-redirect' : 'exception',
-          severityHint: isAuth ? 'S4' : undefined,
-          hesitationMs: maxHesitation,
-          screenshotPath: await shot('error'),
-          note: e.message,
-        });
-        if (isAuth) { await ctx.close(); await browser.close();
-          finalize(results, consoleErrors, networkErrors, base, obsDir, configPath, { abortedByAuth: true });
-          return;
-        }
+      const maxAttempts = 1 + retries;
+      let kept = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const r = await runAttempt(scenario, personaId, attempt);
+        if (r.abortedByAuth || !r.failed || attempt === maxAttempts) { kept = r; break; }
+        // 실패 + 재시도 여지 → 이 attempt 관측 폐기하고 재실행
       }
 
-      // 접근성 자동 스캔 (scenario.a11y === false 로 끌 수 있음)
-      if (scenario.a11y !== false) {
-        const a = await scanA11y(page, scenario.a11yOptions);
-        rec({
-          action: 'a11y-axe-scan',
-          completed: !a.skipped && a.counts.total === 0,
-          isError: false,
-          errorType: null,
-          a11y: a.skipped ? { skipped: true, reason: a.reason } : a.counts,
-          ariaIssue: a.skipped ? a.reason : (a.violations.map((v) => `${v.id}(${v.severity}×${v.nodes})`).join(', ') || null),
-          violations: a.violations,
-          note: a.skipped ? `axe 스킵: ${a.reason}` : `WCAG 위반 ${a.counts.total}건 (S4:${a.counts.S4}/S3:${a.counts.S3}/S2:${a.counts.S2}/S1:${a.counts.S1})`,
-        });
-      }
+      // 이전 attempt 가 실패했지만 최종 attempt 가 통과 → flaky(불안정) 격리 대상
+      const flaky = !kept.failed && kept.attempt > 1;
+      for (const rc of kept.recs) results.push({ ...rc, flaky, attempts: kept.attempt });
+      for (const c of kept.consoleErrs) consoleErrors.push({ ...c, flaky, attempts: kept.attempt });
+      for (const n of kept.netErrs) networkErrors.push({ ...n, flaky, attempts: kept.attempt });
 
-      // 성능 지표(Core Web Vitals) 수집
-      if (collectPerf) {
-        const perf = await readPerf(page);
-        rec({
-          action: 'perf-metrics',
-          completed: perf.ok,
-          isError: false,
-          errorType: null,
-          perf: perf.ok ? { lcp: perf.lcp, cls: perf.cls, fcp: perf.fcp, load: perf.load, ttfb: perf.ttfb } : { skipped: true, reason: perf.reason },
-          note: perf.ok ? `LCP ${perf.lcp}ms · CLS ${perf.cls} · FCP ${perf.fcp}ms · load ${perf.load}ms` : `perf 수집 실패: ${perf.reason}`,
-        });
+      if (kept.abortedByAuth) {
+        await browser.close();
+        finalize(results, consoleErrors, networkErrors, base, obsDir, configPath, { abortedByAuth: true });
+        return;
       }
-
-      await ctx.close();
     }
   }
 
@@ -203,13 +224,17 @@ async function main() {
 }
 
 function finalize(results, consoleErrors, networkErrors, base, obsDir, configPath, extra) {
+  const flakyCount = results.filter((r) => r.flaky).length
+    + consoleErrors.filter((c) => c.flaky).length
+    + networkErrors.filter((n) => n.flaky).length;
   const summary = {
     ranAt: new Date().toISOString(),
     base,
     config: path.relative(ROOT, configPath),
     total: results.length,
     completed: results.filter((r) => r.completed).length,
-    errors: results.filter((r) => r.isError).length,
+    errors: results.filter((r) => r.isError && !r.flaky).length,
+    flaky: flakyCount,
     consoleErrors,
     networkErrors,
     ...extra,
@@ -217,7 +242,7 @@ function finalize(results, consoleErrors, networkErrors, base, obsDir, configPat
   };
   const out = path.join(obsDir, 'raw-observations.json');
   fs.writeFileSync(out, JSON.stringify(summary, null, 2));
-  console.log(`✓ 관측 기록: ${path.relative(ROOT, out)}  (${summary.completed}/${summary.total} 완료, 오류 ${summary.errors})`);
+  console.log(`✓ 관측 기록: ${path.relative(ROOT, out)}  (${summary.completed}/${summary.total} 완료, 결함 ${summary.errors}, flaky ${flakyCount})`);
   if (extra.abortedByAuth) {
     console.error('⛔ 인증 리다이렉트로 중단 — save-auth-state 재실행 후 다시 돌리세요.');
     process.exitCode = 2;

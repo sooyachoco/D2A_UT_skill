@@ -95,11 +95,16 @@ async function main() {
   // 완료율
   const completeRate = funcObs.length ? Math.round((funcObs.filter((r) => r.completed).length / funcObs.length) * 100) : 0;
 
+  // flaky(재시도 후 회복 → 격리): 결함 카운트에서 제외하고 별도 표기
+  const flakyKeys = new Map(); // "persona/scenario" → attempts
+  for (const r of all) if (r.flaky) flakyKeys.set(`${r.persona}/${r.scenario}`, r.attempts || 2);
+  const flakyCount = flakyKeys.size;
+
   // Severity 카운트 (기능 결함 + WCAG 위반 통합)
   const counts = { S4: 0, S3: 0, S2: 0, S1: 0 };
   const findings = [];
 
-  for (const r of funcObs.filter((r) => r.isError)) {
+  for (const r of funcObs.filter((r) => r.isError && !r.flaky)) {
     const { severity, heuristic } = classify(r);
     counts[severity]++;
     findings.push({
@@ -155,7 +160,7 @@ async function main() {
 
   // 콘솔/런타임 오류 승격 (dedupe: 같은 메시지는 1건 + 발생횟수)
   const consoleMap = new Map();
-  for (const c of (raw.consoleErrors || [])) {
+  for (const c of (raw.consoleErrors || []).filter((c) => !c.flaky)) {
     const key = (c.type || 'console') + '::' + (c.text || '').slice(0, 200);
     const e = consoleMap.get(key) || { ...c, count: 0 };
     e.count++; consoleMap.set(key, e);
@@ -176,7 +181,7 @@ async function main() {
 
   // 네트워크 실패(4xx/5xx·요청 실패) 승격 (dedupe: method+url+status)
   const netMap = new Map();
-  for (const n of (raw.networkErrors || [])) {
+  for (const n of (raw.networkErrors || []).filter((n) => !n.flaky)) {
     const key = `${n.method} ${n.status} ${n.url}`;
     const e = netMap.get(key) || { ...n, count: 0 };
     e.count++; netMap.set(key, e);
@@ -219,7 +224,7 @@ async function main() {
   findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
 
   const blocker = counts.S4 > 0 ? `⛔ 배포 블로커 (S4 ${counts.S4}건)` : '✅ 배포 블로커 없음';
-  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric}`;
+  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric} flaky=${flakyCount}`;
 
   const md = [];
   md.push(`# UT_FINDINGS_REPORT — ${path.basename(path.dirname(specDir)) || '프로젝트'}`);
@@ -252,6 +257,7 @@ async function main() {
     ? `LCP ${worstLcp}ms(${worstLcpPersona}) · CLS ${worstCls}(${worstClsPersona})  [예산 LCP≤${perfBudget.lcp}ms/CLS≤${perfBudget.cls}]`
     : (perfSkipped ? '수집 실패' : '수집 안 됨 (config.perf=false)');
   md.push(`- **성능(Core Web Vitals)**: ${perfLine}`);
+  md.push(`- **flaky(재시도 후 회복·격리)**: ${flakyCount}건${flakyCount ? ' — 결함 카운트 제외, 아래 격리 섹션 참조' : ''}`);
   md.push(`- **배포 판정**: ${blocker}`);
   md.push('');
   md.push('## 결함 목록 (심각도 순)');
@@ -269,6 +275,15 @@ async function main() {
       if (f.screenshot) md.push(`- **스크린샷**: ${f.screenshot}`);
       md.push('');
     });
+  }
+
+  if (flakyCount > 0) {
+    md.push('## 불안정(flaky) — 재시도 후 통과, 격리됨');
+    md.push('');
+    md.push('첫 실행에서 실패했으나 재시도에서 회복된 케이스. **결함 카운트·게이트에서 제외**하되, 불안정 신호로 기록한다(반복되면 조사 필요).');
+    md.push('');
+    for (const [key, attempts] of flakyKeys) md.push(`- \`${key}\` — ${attempts}회 시도 후 통과`);
+    md.push('');
   }
 
   md.push('## 한계');

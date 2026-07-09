@@ -32,6 +32,12 @@ export default {
   // perf: false 로 성능 수집 자체를 끌 수 있다.
   perfBudget: { lcp: 2500, lcpPoor: 4000, cls: 0.1, clsPoor: 0.25 },
 
+  // 안정성 — 실패한 시나리오 재시도 횟수(기본 1 = 최대 2회 실행).
+  // 재시도에서 회복되면 flaky로 격리해 결함 카운트·게이트에서 제외한다(일시적 500/타이밍 오탐 방지).
+  retries: 1,
+  // 프레임워크 잡음(HMR·Fast Refresh·Vite·DevTools·favicon 등) 기본 노이즈 필터. false 로 끈다.
+  noiseFilters: true,
+
   // PERSONA.md P1/P2/P3 매핑(SSOT). 시나리오에서 personas 로 개별 override 가능.
   // 'mobile'/'tablet' 은 SSOT 사용자 유형이 아니라 뷰포트 차원 — 필요한 시나리오에만 추가.
   //   예: personas: ['beginner', 'power-user', 'accessibility', 'tablet']
