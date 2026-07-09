@@ -1,28 +1,29 @@
-# D2A UX/UI Skill Bundle
+# D2A UT (사용성 테스트) Skill Bundle
 
-D2A 보일러플레이트의 **AI 네이티브 UX 검증** 기능 묶음 — 본체([D2A_UX_UI](https://github.com/sooyachoco/D2A_UX_UI))에서 UX/UI 사용성 검증과 관련된 스킬·에이전트·데이터·게이트만 추출한 저장소.
+D2A 보일러플레이트의 **AI 네이티브 사용성 테스트(UT) 검증** 기능 묶음 — 본체([D2A_UX_UI](https://github.com/sooyachoco/D2A_UX_UI))에서 **UT 자동 검증과 그 근거·게이트**에 해당하는 스킬·에이전트·데이터만 추출한 저장소.
 
 > 출처 작업 기록: Notion — "🦍 AI 네이티브 사용성 테스트 스킬 구축"
+> 이 번들은 **UT 전용**이다. 화면설계(상류) 스킬(`write-scenario`·`reference-proposal`·`ui-design-workflow`·`ux-audit`)은 포함하지 않는다.
 
 ## 전체 그림
 
 ```
-[사전] 만들기 전 공백 점검        [상류] 누구를 위해 / 왜        [하류] 만든 UI가 쓸 만한가
- ux-audit (PRD·정적)     ──▶    refs/ux-research/   ──읽기──▶  ai-usability-test 스킬
- (7렌즈 휴리스틱 진단)             (페르소나·여정 단일출처)        (Playwright 3페르소나 자동 검증)
-                                                                      │
-                                                                      ▼
-                                                             MCP `ut:` done 게이트
-                                                             (S4 결함 → Phase 자동 차단)
+[상류] 누구를 위해 / 왜              [하류] 만든 UI가 쓸 만한가            [종착] 개발 전달
+ ux-research-sync                     ai-usability-test 스킬               design-handoff
+ (실데이터 → SSOT 주입)   ──읽기──▶   (Playwright 3페르소나 자동 검증)  ──▶  (S4=0 후 HANDOFF.md)
+        │                                     │
+        ▼                                     ▼
+ refs/ux-research/                    MCP `ut:` done 게이트
+ (페르소나·여정 단일출처)              (S4 결함 → Phase 자동 차단)
 ```
 
 사람이 눈으로 보던 UX 검수를, **코드가 숫자로 검사해 자동으로 막는 강제 게이트**로 전환한 묶음이다.
-상류(리서치)와 하류(검증)는 페르소나·여정을 **한 곳에서만 정의**해 drift(정의 중복)를 제거한다.
+페르소나·여정은 `refs/ux-research/` **한 곳에서만 정의**하고, UT 스킬은 그것을 **읽기만** 해 drift(정의 중복)를 제거한다.
 
 ## 🔧 보일러플레이트 엔진과 병합 셋업
 
 이 번들은 **단독 실행용이 아니라** D2A 보일러플레이트(엔진, `d2a-boilerplate-claude`) 위에 얹는 **오버레이**다.
-아래 5스텝이면 엔진에 병합되어 스킬 18종 → **25종** + UX 리서치 SSOT + `ut:` 강제 게이트가 활성화된다.
+아래 스텝이면 엔진에 UX 리서치 SSOT + `ut:` 강제 게이트 + UT 스킬 3종이 활성화된다.
 
 ```bash
 # 0) 엔진(보일러플레이트) 준비 — 없으면 먼저 설치
@@ -39,23 +40,22 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 ```
 
 **설치기가 자동으로 하는 것**
-1. 신규 파일 복사 — UX/UI 스킬(`write-scenario`·`reference-proposal`·`ux-audit`·`ux-research-sync`·`ui-design-workflow`·`ai-usability-test`·`design-handoff`) + `refs/ux-research/`(SSOT 10종) + `frontend/tests/ut/run-ut.mjs` + `accessibility` 서브에이전트
+1. 신규 파일 복사 — UT 스킬 3종(`ux-research-sync`·`ai-usability-test`·`design-handoff`) + `refs/ux-research/`(SSOT 10종) + `frontend/tests/ut/run-ut.mjs` + `accessibility` 서브에이전트
 2. 충돌 파일 덮어쓰기(상위호환) — `create-spec.md`·`pre-launch-check.md`·`task-validator.ts` (기존은 `.bak-<timestamp>` 백업)
 3. **MCP 자동 재빌드** — `task-validator.ts` 를 덮어썼으므로 `d2a-mcp-server` 를 `npm install && npm run build` 재빌드해 **`ut:` 게이트를 활성화**(구버전 `dist/` 가 게이트를 조용히 죽이는 것 방지)
 
 **남은 수동 2스텝 (병합 후 정합성)**
-4. `CLAUDE.md` **스킬 표에 7종 등록** + 스킬 수 표기 **18개 → 25개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공)
+4. `CLAUDE.md` **스킬 표에 신규 3종 등록** + 스킬 수 표기 **18개 → 21개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공). `create-spec`·`pre-launch-check` 은 기존 엔진 스킬 덮어쓰기라 신규 등록 대상이 아니다.
 5. 프로젝트 시작 시 **`ux-research-sync 실행해줘`** 로 SSOT(페르소나·여정·과업)를 실제 데이터로 채움 (채우기 전엔 전 항목 🔵 가설)
 
 **병합 검증 (선택)**
 ```bash
-ls .claude/skills | wc -l                                  # 25
 grep -c 'ut:' d2a-mcp-server/src/tools/task-validator.ts   # >0 (게이트 존재)
 grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 ```
 
 > 파일별 병합 판정(상위호환/동일)·경로 매핑·CLAUDE.md 등록 스니펫 상세는 [`INTEGRATION.md`](INTEGRATION.md) 참조.
-> 병합이 끝나면 파이프라인은 `write-scenario → reference-proposal → ui-design-workflow → create-spec(코딩) → ai-usability-test → design-handoff → run-phase(ut: 게이트)` 로 흐른다.
+> 병합이 끝나면 파이프라인은 `create-spec(코딩) → ai-usability-test → design-handoff → run-phase(ut: 게이트)` 로 흐른다.
 
 ## 구성
 
@@ -63,25 +63,21 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 
 | 파일 | 역할 |
 |---|---|
-| `ux-audit.md` | **PRD·플로우·와이어프레임 사전 진단(shift-left).** 7개 UX 렌즈(플로우·인증·결제·에러복구·멘탈모델·빈상태·피드백) 휴리스틱으로 공백을 하나씩 질문해 잡는다. 코드 작성 전 단계, 자문형(점수·게이트 없음) |
-| `ai-usability-test.md` | Playwright + 3페르소나(초보/파워/접근성) + Nielsen 휴리스틱 자동 사용성 테스트. 산출물 5종 생성, MCP `ut:` done 기준 |
-| `design-handoff.md` | **(종착·신규)** UT 통과(S4=0) 후 개발 핸드오프 스펙 생성. `design:design-handoff` 플러그인을 엔진으로 호출(없으면 폴백), 앞 단계 산출물을 묶어 `HANDOFF.md`로 출력. 새 결정 금지(설계는 ui-design-workflow 소관) |
-| `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 8종 주입. 단일 source 공급 |
-| `write-scenario.md` | **(상류·신규)** PRD→흐름 strawman 사용자 확정(AI 추측 금지)→페르소나별 과업 시나리오→잠정 화면 후보. 커버리지까지만 책임, 충실도는 ui-design-workflow에 위임. 산출 `scenario.md` |
-| `reference-proposal.md` | **(상류·신규)** 화면설계 전 레퍼런스를 AI가 제안→사용자 선택. 기준 톤 1개 + 화면별 인터랙션 레퍼런스(키스톤). 산출 `reference-board.md` |
-| `ui-design-workflow.md` | PRD→0단계 게이트→3안 발산→확정 락→상태설계→자가점검→0-드리프트 전사→AI UT 게이트. STEP 1이 `scenario.md`를 소비(흐름 재확정 생략) |
-| `create-spec.md` | spec/plan/tasks 생성. Step 0.5(리서치 로드) + Step 2.7.5(AI UT 자동 게이트) 포함 |
-| `pre-launch-check.md` | 배포 전 검증 체크리스트 (UT_FINDINGS_REPORT 갈음 규칙 연동) |
+| `ai-usability-test.md` | **핵심 UT 스킬.** Playwright + 3페르소나(초보/파워/접근성) + Nielsen 휴리스틱 자동 사용성 테스트. 산출물 5종 생성, MCP `ut:` done 기준 |
+| `ux-research-sync.md` | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 주입. UT 페르소나의 단일 source 공급 |
+| `design-handoff.md` | **(종착)** UT 통과(S4=0) 후 개발 핸드오프 스펙 생성. `design:design-handoff` 플러그인을 엔진으로 호출(없으면 폴백), 앞 단계 산출물을 묶어 `HANDOFF.md`로 출력. 새 결정 금지 |
+| `create-spec.md` | (엔진 상위호환) spec/plan/tasks 생성. Step 0.5(STEP 0 점검) + Step 2.7.5(AI UT 자동 게이트) 포함 |
+| `pre-launch-check.md` | (엔진 상위호환) 배포 전 검증 체크리스트 (UT_FINDINGS_REPORT 갈음 규칙 연동) |
 
 ### 2. 에이전트 (`.claude/subagent-templates/`)
 
 | 파일 | 역할 |
 |---|---|
-| `accessibility.md` | 접근성 리뷰 서브에이전트 템플릿 (ARIA·Tab·Focus) |
+| `accessibility.md` | 접근성 리뷰 서브에이전트 템플릿 (ARIA·Tab·Focus) — UT 접근성 페르소나(P3) 심화 |
 
 ### 3. UX 리서치 단일 source (`refs/ux-research/`)
 
-페르소나·여정을 한 곳에서만 정의하는 SSOT. 검증 스킬은 **읽기만** 한다.
+페르소나·여정을 한 곳에서만 정의하는 SSOT. UT 스킬은 **읽기만** 한다.
 
 > ⚠️ **템플릿(빈) 상태로 배포된다.** 10종 모두 구조·규약만 갖춘 골격이며 실데이터는 비어 있다.
 > **프로젝트 시작 시 `ux-research-sync 실행해줘`** 로 대상 서비스의 실제 리서치 데이터(MCP/Notion 등)를
@@ -104,8 +100,14 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 
 | 파일 | 역할 |
 |---|---|
-| `d2a-mcp-server/src/tools/task-validator.ts` | `checkUtReport` — `done` 기준의 `ut: {리포트} :: S4=0,S3<=2` 평가. 위반 시 Phase 자동 차단 |
-| `frontend/tests/ut/run-ut.mjs` | UT 러너. `tests/e2e/.auth/user.json` storageState 재사용 → 인증 상태에서 UT 실행 |
+| `d2a-mcp-server/src/tools/task-validator.ts` | `checkUtReport` — `done` 기준의 `ut: {리포트} :: S4=0,S3<=2,complete>=80,wcag=0,visual=0,console=0,lcp<=2500,cls<=100` 평가. Severity + 완료율 + 접근성 + 시각적 회귀 + 런타임/네트워크 오류 + 성능까지 임계로 걸며, 위반 시 Phase 자동 차단 |
+| `frontend/tests/ut/run-ut.mjs` | 범용 UT 러너. `ut.config.mjs` 시나리오를 3페르소나(+선택적 모바일/태블릿)로 재현, storageState 재사용, 인증 리다이렉트 가드, axe 스캔, 콘솔/네트워크 오류·성능 수집 |
+| `frontend/tests/ut/ut-personas.mjs` | P1/P2/P3 행동 모델(느린클릭/빠른클릭/키보드전용) + 선택적 `mobile`/`tablet` 프로파일(터치·뷰포트·above-fold 체크) |
+| `frontend/tests/ut/ut-a11y.mjs` | axe-core WCAG 자동 스캔 → S1~S4 매핑 (`@axe-core/playwright` 설치 시 활성) |
+| `frontend/tests/ut/ut-visual-diff.mjs` | 이전 실행(baseline) 대비 스크린샷 픽셀 diff → 레이아웃 회귀 자동 감지 (`pixelmatch`+`pngjs` 설치 시 활성) |
+| `frontend/tests/ut/ut-perf.mjs` | Core Web Vitals(LCP/CLS/FCP) 수집 + 예산 대비 분류. 외부 의존 없음 |
+| `frontend/tests/ut/ut-aggregate.mjs` | `raw-observations.json` + 시각적 diff → `UT_FINDINGS_REPORT.md` 자동 집계. WCAG·런타임/네트워크 오류·성능·시각 회귀를 severity로 승격 + 게이트용 지표 주석 삽입 |
+| `frontend/tests/ut/ut.config.example.mjs` | 시나리오 정의 예시 (`ut.config.mjs` 로 복사) |
 
 ## `ut:` done 기준
 
@@ -113,11 +115,12 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 
 ```yaml
 done:
-  - ut: specs/001-xxx/ut/UT_FINDINGS_REPORT.md :: S4=0,S3<=2
+  - ut: specs/001-xxx/ut/UT_FINDINGS_REPORT.md :: S4=0,S3<=2,complete>=80,wcag=0,visual=0,console=0,lcp<=2500,cls<=100
 ```
 
-`submit_task` 시 리포트의 Executive Summary에서 S1~S4 카운트를 추출해 임계 규칙을 평가한다.
-리포트 부재·카운트 미검출 시 **실패 처리**(UT 미실행을 통과로 오인 방지).
+`submit_task` 시 리포트의 `ut-metrics` 주석(또는 폴백으로 Executive Summary 표)에서 지표를 추출해 임계 규칙을 평가한다:
+S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`visual`) · 런타임 오류(`console`) · 네트워크 오류(`net`) · 성능(`lcp` ms, `cls` = CLS×1000).
+리포트 부재·지표 미검출 시 **실패 처리**(UT 미실행을 통과로 오인 방지).
 
 ## Severity 분류 (Nielsen)
 
@@ -145,8 +148,8 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 
 설치기는 신규 파일을 복사하고 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은
 `.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:` 게이트 활성화를 위해 MCP 를 자동 재빌드**한다
-(`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내). 끝나면 콘솔이 남은 1단계를 안내한다:
-1. `CLAUDE.md` 스킬 표에 7종(`write-scenario`/`reference-proposal`/`ux-audit`/`ux-research-sync`/`ui-design-workflow`/`ai-usability-test`/`design-handoff`) 등록
+(`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내). 끝나면 콘솔이 남은 수동 단계를 안내한다:
+1. `CLAUDE.md` 스킬 표에 신규 3종(`ux-research-sync`/`ai-usability-test`/`design-handoff`) 등록 + 개수 21개
 
 > MCP 빌드는 보일러플레이트 초기 셋업의 빌드와 동일한 작업이다. 설치기가 덮어쓴 직후 자동 재실행해
 > 구버전 `dist/` 가 남지 않도록 보장한다(`ut:` 게이트가 조용히 죽는 것을 방지).
@@ -155,10 +158,10 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 
 ## 통합
 
-본체(`d2a-boilerplate-claude`)에 병합하는 검증된 절차는 [`INTEGRATION.md`](INTEGRATION.md) 참조 — 신규 6건 / 충돌 4건의 diff 판정(모두 상위호환), CLAUDE.md 등록 스니펫, `dist/` 재빌드 절차를 담았다.
+본체(`d2a-boilerplate-claude`)에 병합하는 검증된 절차는 [`INTEGRATION.md`](INTEGRATION.md) 참조 — 신규 5건 / 충돌 4건의 diff 판정(모두 상위호환), CLAUDE.md 등록 스니펫, `dist/` 재빌드 절차를 담았다.
 
 ## 비고
 
-- 본 묶음은 D2A 보일러플레이트 본체에서 발췌한 것으로, 단독 실행보다는 본체 구조(`.claude/`, `d2a-mcp-server/`, `refs/`) 안에 배치해 사용하는 것을 전제로 한다.
+- 본 묶음은 D2A 보일러플레이트 본체에서 **UT 검증 부분만** 발췌한 것으로, 단독 실행보다는 본체 구조(`.claude/`, `d2a-mcp-server/`, `refs/`) 안에 배치해 사용하는 것을 전제로 한다.
+- 화면설계(상류) 스킬은 이 번들에서 제외됐다. 설계 단계가 필요하면 별도 설계 번들을 함께 얹거나, `refs/ux-research/` SSOT + 외부 설계 산출물(`scenario.md`·`reference-board.md`)을 입력으로 제공한다.
 - `refs/ux-research/` 10종은 **빈 템플릿**으로 배포된다. 특정 서비스의 실데이터는 포함하지 않으며, `ux-research-sync` 스킬이 프로젝트 시작 시 실제 리서치 데이터로 채운다.
-- `ux-audit.md` 는 replatform-playground/ux-audit-skill(v2.2.0)에서 도입했다. 범용 번들에 맞춰 **Step 2.5만 완화**(사내 `gamescale-expert` 하드 의존 → "사내 표준 스킬 있으면 참조, 없으면 업계 표준") 했고, 7개 렌즈 분석 본문은 원문 그대로다.

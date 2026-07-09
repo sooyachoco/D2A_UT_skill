@@ -127,10 +127,10 @@ async function executeCriterion(
     return checkCoverageReport(sourcePath.trim(), parseInt(thresholdStr, 10), cwd);
   }
 
-  // ut: {report 경로} :: {S4=0,S3<=2}
-  // AI 사용성 테스트(ai-usability-test) 리포트의 Executive Summary 에서
-  // Severity 카운트(S4/S3/S2/S1)를 추출하여 임계 규칙을 모두 만족하는지 확인한다.
-  // 예: ut: specs/001/ut/UT_FINDINGS_REPORT.md :: S4=0,S3<=2
+  // ut: {report 경로} :: {S4=0,S3<=2,complete>=80,wcag=0}
+  // AI 사용성 테스트(ai-usability-test) 리포트에서 지표를 추출하여 임계 규칙을 모두 만족하는지 확인한다.
+  // 지표: Severity 카운트(S4/S3/S2/S1) + complete(완료율%) + wcag(접근성 위반) 등 임의 키.
+  // 예: ut: specs/001/ut/UT_FINDINGS_REPORT.md :: S4=0,S3<=2,complete>=80
   const utTyped = trimmed.match(/^ut:\s*(.+?)\s*::\s*(.+)$/i);
   if (utTyped) {
     const [, reportPart, criteriaStr] = utTyped;
@@ -372,20 +372,19 @@ function formatCoverageResult(
 
 /**
  * AI 사용성 테스트 리포트(UT_FINDINGS_REPORT.md)를 파싱하여
- * Severity 임계 규칙을 모두 만족하는지 확인한다.
+ * 지표 임계 규칙을 모두 만족하는지 확인한다.
  *
- * 리포트 Executive Summary 형식 (ai-usability-test 스킬 산출):
- *   | 등급 | 건수 |
- *   |---|---|
- *   | S4 Critical | 0 |
- *   | S3 Major | 2 |
- *   ...
+ * 지표 추출 우선순위:
+ *   1) machine-readable 주석 (ut-aggregate.mjs 산출) — 가장 신뢰:
+ *        <!-- ut-metrics: S4=0 S3=1 S2=2 S1=0 complete=92 wcag=0 -->
+ *   2) 폴백: Executive Summary 표의 "S4 Critical | N" 행에서 Severity 카운트만 추출.
  *
- * 규칙 형식: 콤마로 구분된 "S{n}{op}{value}" 목록.
+ * 규칙 형식: 콤마로 구분된 "{key}{op}{value}" 목록. key 는 대소문자 무관.
+ *   지원 키: S1~S4(결함 카운트), complete(완료율%), wcag(접근성 위반) 등 리포트가 노출하는 임의 지표.
  *   지원 연산자: =, ==, !=, <, <=, >, >=
- *   예: "S4=0,S3<=2"
+ *   예: "S4=0,S3<=2,complete>=80,wcag=0"
  *
- * 리포트가 없거나 Severity 카운트를 한 건도 못 찾으면 실패로 처리한다
+ * 리포트가 없거나 지표를 한 건도 못 찾으면 실패로 처리한다
  * (UT 미실행을 통과로 오인하지 않기 위함).
  */
 function checkUtReport(
@@ -408,22 +407,33 @@ function checkUtReport(
     };
   }
 
-  // Executive Summary 의 "S4 ... | N" 형태 행에서 등급별 카운트를 추출.
-  // 표 셀(| S4 Critical | 0 |) 과 인라인(S4=0, S4: 0) 모두 허용한다.
   const counts: Record<string, number> = {};
-  for (const level of ["S1", "S2", "S3", "S4"]) {
-    // 같은 줄에 S{n} 과 숫자가 함께 있는 첫 매칭을 카운트로 본다.
-    const re = new RegExp(`${level}\\b[^\\d\\n]*?(\\d+)`, "i");
-    const m = content.match(re);
-    if (m) counts[level] = parseInt(m[1], 10);
+
+  // 1) machine-readable 지표 주석 우선: <!-- ut-metrics: S4=0 S3=1 complete=92 wcag=0 -->
+  const metricsLine = content.match(/ut-metrics:\s*([^\n>]+)/i);
+  if (metricsLine) {
+    for (const pair of metricsLine[1].trim().split(/[\s,]+/)) {
+      const kv = pair.match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*(\d+)$/);
+      if (kv) counts[kv[1].toUpperCase()] = parseInt(kv[2], 10);
+    }
+  }
+
+  // 2) 폴백: Executive Summary 의 "S4 ... | N" 표 행에서 Severity 카운트를 추출.
+  //    표 셀(| S4 Critical | 0 |) 과 인라인(S4=0, S4: 0) 모두 허용한다.
+  if (Object.keys(counts).length === 0) {
+    for (const level of ["S1", "S2", "S3", "S4"]) {
+      const re = new RegExp(`${level}\\b[^\\d\\n]*?(\\d+)`, "i");
+      const m = content.match(re);
+      if (m) counts[level] = parseInt(m[1], 10);
+    }
   }
 
   if (Object.keys(counts).length === 0) {
     return {
       passed: false,
       reason:
-        `ut: ${reportPath} 에서 Severity 카운트(S1~S4)를 찾지 못함 — ` +
-        `리포트의 Executive Summary 표 형식을 확인하세요.`,
+        `ut: ${reportPath} 에서 지표(S1~S4/complete/wcag 등)를 찾지 못함 — ` +
+        `ut-metrics 주석 또는 Executive Summary 표 형식을 확인하세요.`,
     };
   }
 
@@ -433,9 +443,9 @@ function checkUtReport(
   const checked: string[] = [];
 
   for (const rule of rules) {
-    const rm = rule.match(/^(S[1-4])\s*(==|!=|<=|>=|=|<|>)\s*(\d+)$/i);
+    const rm = rule.match(/^([A-Za-z][A-Za-z0-9_]*)\s*(==|!=|<=|>=|=|<|>)\s*(\d+)$/i);
     if (!rm) {
-      failures.push(`잘못된 규칙 형식: "${rule}" (예: S4=0, S3<=2)`);
+      failures.push(`잘못된 규칙 형식: "${rule}" (예: S4=0, S3<=2, complete>=80)`);
       continue;
     }
     const level = rm[1].toUpperCase();

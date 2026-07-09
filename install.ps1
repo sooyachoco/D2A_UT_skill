@@ -1,5 +1,5 @@
 <#
-  D2A UX/UI Skill Bundle 설치기 (Windows / PowerShell)
+  D2A UT (사용성 테스트) Skill Bundle 설치기 (Windows / PowerShell)
   이 번들의 오버레이 파일을 d2a-boilerplate-claude 의 template/ 에 복사한다.
 
   사용법:
@@ -82,6 +82,10 @@ if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
 
 Write-Host ""
 Write-Host "남은 수동 1단계:"
-Write-Host "[*] CLAUDE.md 스킬 표에 4종 등록 (ux-audit / ux-research-sync / ui-design-workflow / ai-usability-test)"
+Write-Host "[*] CLAUDE.md 스킬 표에 신규 3종 등록 + 스킬 수 표기 18개 → 21개"
+Write-Host "      /ux-research-sync   외부 리서치 데이터를 refs/ux-research SSOT에 3단계 신뢰도로 적재"
+Write-Host "      /ai-usability-test  Playwright 3 페르소나 자동 사용성 테스트 → UT_FINDINGS_REPORT.md"
+Write-Host "      /design-handoff     UT 통과(S4=0) 후 개발 핸드오프 스펙 생성 (HANDOFF.md)"
+Write-Host "    (create-spec·pre-launch-check 은 기존 엔진 스킬 상위호환 덮어쓰기 — 신규 등록 아님)"
 Write-Host ""
 Write-Host "자세한 병합 판정·매핑은 INTEGRATION.md 참조."
