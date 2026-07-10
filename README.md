@@ -116,6 +116,8 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 | `d2a-mcp-server/src/tools/task-validator.ts` | `checkUtReport` — `done` 기준의 `ut: {리포트} :: S4=0,S3<=2,complete>=80,wcag=0,visual=0,console=0,lcp<=2500,cls<=100` 평가. Severity + 완료율 + 접근성 + 시각적 회귀 + 런타임/네트워크 오류 + 성능까지 임계로 걸며, 위반 시 Phase 자동 차단 |
 | `frontend/tests/ut/run-ut.mjs`               | 범용 UT 러너. `ut.config.mjs` 시나리오를 3페르소나(+선택적 모바일/태블릿)로 재현, storageState 재사용, 인증 리다이렉트 가드, axe 스캔, 콘솔/네트워크 오류·성능 수집                                                                                 |
 | `frontend/tests/ut/ut-personas.mjs`          | P1/P2/P3 행동 모델(느린클릭/빠른클릭/키보드전용) + 선택적 `mobile`/`tablet` 프로파일(터치·뷰포트·above-fold 체크)                                                                                                               |
+| `frontend/tests/ut/ut-heuristics.mjs` ⭐신규    | 결정론적 Nielsen 검출기(above-fold CTA·destructive-confirm·form-error-recovery·keyboard-reachable 등). 시나리오가 호출해 "AI 눈대중" 대신 관찰 조건을 코드로 검사하고 표준 `errorType` 을 방출                                                     |
+| `frontend/tests/ut/UT_HEURISTIC_RUBRIC.md` ⭐신규 | **판정 계약** — `errorType`→휴리스틱→severity→신뢰도 규칙표. 게이트는 결정론 규칙에만 걸고 LLM 자유 라벨은 advisory 로 분리(근거 없는 게이트 방지) + 개선안 패턴 카탈로그                                                                                    |
 | `frontend/tests/ut/ut-a11y.mjs`              | axe-core WCAG 자동 스캔 → S1~S4 매핑 (`@axe-core/playwright` 설치 시 활성)                                                                                                                                  |
 | `frontend/tests/ut/ut-visual-diff.mjs`       | 이전 실행(baseline) 대비 스크린샷 픽셀 diff → 레이아웃 회귀 자동 감지 (`pixelmatch`+`pngjs` 설치 시 활성)                                                                                                                   |
 | `frontend/tests/ut/ut-perf.mjs`              | Core Web Vitals(LCP/CLS/FCP) 수집 + 예산 대비 분류. 외부 의존 없음                                                                                                                                             |
@@ -133,8 +135,10 @@ done:
 ```
 
 `submit_task` 시 리포트의 `ut-metrics` 주석(또는 폴백으로 Executive Summary 표)에서 지표를 추출해 임계 규칙을 평가한다:
-S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`visual`) · 런타임 오류(`console`) · 네트워크 오류(`net`) · 성능(`lcp` ms, `cls` = CLS×1000) · flaky 격리 수(`flaky`) · 기능 커버리지(`coverage` %, spec F-xx 대비).
+S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`visual`) · 런타임 오류(`console`) · 네트워크 오류(`net`) · 성능(`lcp` ms, `cls` = CLS×1000) · flaky 격리 수(`flaky`) · advisory 수(`advisory`) · 기능 커버리지(`coverage` %, spec F-xx 대비).
 실패 시나리오는 `retries`(기본 1) 재시도 후 회복되면 flaky로 격리해 결함·게이트에서 제외한다(오탐 방지).
+
+**휴리스틱 판정 계약 (신규)**: severity 분류는 [`UT_HEURISTIC_RUBRIC.md`](frontend/tests/ut/UT_HEURISTIC_RUBRIC.md) 계약을 따른다. `errorType` 이 규칙표에 등재된 findings 만 **결정론 규칙(provenance=rule)** 으로 게이트(S1~S4)에 반영하고, 규칙표에 없이 LLM 이 자유 라벨링한 findings 는 **advisory** 로 분리해 게이트에서 제외한다(리포트엔 표시). AI 의 "좋다/나쁘다" 자유 판단을 게이트 근거로 쓰지 않기 위한 장치다 — 개선안(REDESIGN)도 자유 생성 대신 카탈로그 기반 **가설**로 다루며 검증 전 배포하지 않는다.
 리포트 부재·지표 미검출 시 **실패 처리**(UT 미실행을 통과로 오인 방지).
 
 ## Severity 분류 (Nielsen)

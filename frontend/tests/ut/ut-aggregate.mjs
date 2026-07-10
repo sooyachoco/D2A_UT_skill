@@ -1,9 +1,13 @@
 // ut-aggregate.mjs — raw-observations.json → UT_FINDINGS_REPORT.md 자동 집계
 //
 // ai-usability-test 스킬 Step 4(Nielsen 휴리스틱 리포트)를 자동화한다.
-//   · Severity 자동 분류 (관측 신호 + axe WCAG 위반 + 시각적 회귀 통합)
+//   · Severity 분류 — UT_HEURISTIC_RUBRIC.md 계약 기반 (결정론 규칙 = 게이트, LLM 라벨 = advisory)
 //   · 완료율·WCAG 위반·시각적 회귀 집계
 //   · ut: 게이트가 파싱하는 machine-readable 지표 주석 삽입
+//
+// 분류 계약(단일 source): frontend/tests/ut/UT_HEURISTIC_RUBRIC.md
+//   · errorType 이 규칙표에 등재 → provenance=rule, 게이트 대상(S1~S4 카운트)
+//   · errorType 없이 severityHint/heuristic 만(=LLM 사후 라벨) 또는 미등재 → advisory(게이트 제외, 별도 표기)
 //
 // visual-diff/diff-report.json 이 있으면(ut-visual-diff.mjs 실행 결과) 함께 집계한다 — 선택 사항.
 //
@@ -24,15 +28,35 @@ const HEURISTIC = {
   N4: '일관성·표준', N5: '오류 예방', N6: '기억보다 인식',
   N7: '사용 유연성·효율', N8: '미적 절제', N9: '오류 복구 지원', N10: '도움말·문서',
 };
-// errorType → { heuristic, severity } 기본 매핑 (관측에 명시값 있으면 우선)
+// errorType → { heuristic, severity } 결정론 규칙표 (UT_HEURISTIC_RUBRIC.md §2 와 1:1 일치).
+// 여기 등재된 errorType 만 게이트 대상(provenance=rule). 미등재는 advisory 로 분리된다.
 const ERROR_DEFAULTS = {
+  // 진입/네비게이션
   'auth-redirect': { heuristic: 'N9', severity: 'S4' },
-  'navigation-dead-end': { heuristic: 'N1', severity: 'S3' },
   'primary-not-tab-reachable': { heuristic: 'N7', severity: 'S4' },
-  'minimize-no-restore': { heuristic: 'N3', severity: 'S3' },
+  'navigation-dead-end': { heuristic: 'N1', severity: 'S3' },
+  'dead-end': { heuristic: 'N1', severity: 'S3' },
+  'nav-confusion': { heuristic: 'N1', severity: 'S3' },
+  // 상태·피드백 (N1)
   'reaction-no-feedback': { heuristic: 'N1', severity: 'S3' },
+  'no-loading-indicator': { heuristic: 'N1', severity: 'S3' },
   'exception': { heuristic: 'N1', severity: 'S3' },
+  // 통제·자유 (N3)
+  'minimize-no-restore': { heuristic: 'N3', severity: 'S3' },
+  'no-undo-affordance': { heuristic: 'N3', severity: 'S2' },
+  // 일관성 (N4)
+  'inconsistent-control': { heuristic: 'N4', severity: 'S2' },
+  // 오류 예방 (N5)
+  'destructive-no-confirm': { heuristic: 'N5', severity: 'S3' },
+  // 효율 (N7)
+  'cta-below-fold': { heuristic: 'N7', severity: 'S3' },
+  // 오류 복구 (N9)
+  'form-error': { heuristic: 'N9', severity: 'S3' },
+  'form-error-no-recovery': { heuristic: 'N9', severity: 'S3' },
+  // 인식 (N6) — 관찰된 오클릭
+  'wrong-click': { heuristic: 'N6', severity: 'S2' },
 };
+const SEVS = new Set(['S1', 'S2', 'S3', 'S4']);
 const SEV_LABEL = { S4: 'Critical', S3: 'Major', S2: 'Minor', S1: 'Cosmetic' };
 
 async function loadConfig() {
@@ -53,12 +77,23 @@ async function resolveSpecDir(cfg) {
   return path.resolve(ROOT, 'specs/ut');
 }
 
+// UT_HEURISTIC_RUBRIC.md §3 — provenance/신뢰도 계약.
+//   rule         : errorType 이 규칙표 등재 → 게이트 대상, severity 는 규칙표가 권위
+//   ai-hint      : errorType 미등재 + severityHint/heuristic 만 → advisory(게이트 제외)
+//   unclassified : 아무 근거 없음 → advisory. 옛 "무조건 N1/S3" 기본값을 폐기(근거 없는 게이트 방지)
 function classify(r) {
-  const def = ERROR_DEFAULTS[r.errorType] || {};
-  return {
-    severity: r.severityHint || def.severity || 'S3',
-    heuristic: r.heuristic || def.heuristic || 'N1',
-  };
+  const def = ERROR_DEFAULTS[r.errorType];
+  if (def) {
+    return { severity: def.severity, heuristic: def.heuristic, confidence: 'high', provenance: 'rule', gated: true };
+  }
+  if (r.heuristic || SEVS.has(r.severityHint)) {
+    return {
+      severity: SEVS.has(r.severityHint) ? r.severityHint : 'S2',
+      heuristic: r.heuristic || 'N-unclassified',
+      confidence: 'low', provenance: 'ai-hint', gated: false,
+    };
+  }
+  return { severity: 'S2', heuristic: 'N-unclassified', confidence: 'low', provenance: 'unclassified', gated: false };
 }
 
 function shortUrl(u) {
@@ -72,6 +107,7 @@ const KIND_LABEL = {
   'N-runtime': '런타임 오류(콘솔/예외)',
   'N-network': '네트워크 오류',
   'N-perf': '성능(Core Web Vitals)',
+  'N-unclassified': '미분류 (AI 판단 — 검토 필요)',
 };
 
 async function main() {
@@ -108,20 +144,27 @@ async function main() {
   const uncovered = features.filter((f) => !coveredSet.has(f));
   const coveragePct = features.length ? Math.round(((features.length - uncovered.length) / features.length) * 100) : null;
 
-  // Severity 카운트 (기능 결함 + WCAG 위반 통합)
+  // Severity 카운트 (결정론 findings 만 게이트에 반영: rule 기반 기능 결함 + WCAG/시각/런타임/네트워크/성능)
   const counts = { S4: 0, S3: 0, S2: 0, S1: 0 };
-  const findings = [];
+  const findings = [];   // 게이트 대상 (provenance=rule + 비-Nielsen 결정론 카테고리)
+  const advisory = [];   // 게이트 제외 (LLM 판단·미분류 — 사람 검토)
 
   for (const r of funcObs.filter((r) => r.isError && !r.flaky)) {
-    const { severity, heuristic } = classify(r);
-    counts[severity]++;
-    findings.push({
-      severity, heuristic,
+    const c = classify(r);
+    const finding = {
+      severity: c.severity, heuristic: c.heuristic,
+      confidence: c.confidence, provenance: c.provenance,
       title: `[${r.scenario}] ${r.errorType || 'issue'} — ${r.title || ''}`.trim(),
       persona: r.persona, scenario: r.scenario,
       symptom: r.note || '', screenshot: r.screenshotPath || null,
       kind: 'functional',
-    });
+    };
+    if (c.gated) {
+      counts[c.severity]++;
+      findings.push(finding);
+    } else {
+      advisory.push(finding);
+    }
   }
 
   let wcagTotal = 0;
@@ -230,9 +273,10 @@ async function main() {
 
   const order = ['S4', 'S3', 'S2', 'S1'];
   findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
+  advisory.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
 
   const blocker = counts.S4 > 0 ? `⛔ 배포 블로커 (S4 ${counts.S4}건)` : '✅ 배포 블로커 없음';
-  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric} flaky=${flakyCount}`
+  const metrics = `S4=${counts.S4} S3=${counts.S3} S2=${counts.S2} S1=${counts.S1} complete=${completeRate} wcag=${wcagTotal} visual=${visualFlagged} console=${consoleCount} net=${netCount} lcp=${worstLcp} cls=${clsMetric} flaky=${flakyCount} advisory=${advisory.length}`
     + (coveragePct !== null ? ` coverage=${coveragePct}` : '');
 
   const md = [];
@@ -271,6 +315,7 @@ async function main() {
     ? '미측정 (`ut.config.mjs`에 `features: [F-xx…]` 미선언)'
     : `${coveragePct}% (${features.length - uncovered.length}/${features.length} 기능)${uncovered.length ? ` — 미커버 ${uncovered.length}건` : ''}`;
   md.push(`- **기능 커버리지(spec F-xx)**: ${coverageLine}`);
+  md.push(`- **advisory(AI 판단·미분류 — 게이트 제외)**: ${advisory.length}건${advisory.length ? ' — 아래 advisory 섹션 참조' : ''}`);
   md.push(`- **배포 판정**: ${blocker}`);
   md.push('');
   md.push('## 결함 목록 (심각도 순)');
@@ -283,6 +328,24 @@ async function main() {
       md.push(`### [F-${String(i + 1).padStart(3, '0')}] ${f.title}`);
       md.push(`- **Severity**: ${f.severity} — ${SEV_LABEL[f.severity]}`);
       md.push(`- **휴리스틱**: ${hName}`);
+      md.push(`- **영향 페르소나**: ${f.persona}`);
+      md.push(`- **관찰된 증상**: ${f.symptom}`);
+      if (f.screenshot) md.push(`- **스크린샷**: ${f.screenshot}`);
+      md.push('');
+    });
+  }
+
+  if (advisory.length > 0) {
+    md.push('## advisory (AI 판단·미분류 — 게이트 제외, 사람 검토)');
+    md.push('');
+    md.push('결정론 규칙(UT_HEURISTIC_RUBRIC.md §2)에 매칭되지 않아 **게이트에 반영되지 않은** findings. LLM 사후 라벨 또는 미분류라 신뢰도가 낮다 — 배포 차단 근거로 쓰지 말고 사람이 검토해 판단한다. (규칙표에 어휘를 추가하면 결정론 findings 로 승격된다.)');
+    md.push('');
+    advisory.forEach((f, i) => {
+      const hName = KIND_LABEL[f.heuristic] || `${f.heuristic} ${HEURISTIC[f.heuristic] || ''}`.trim();
+      md.push(`### [A-${String(i + 1).padStart(3, '0')}] ${f.title}`);
+      md.push(`- **추정 Severity**: ${f.severity} — ${SEV_LABEL[f.severity]} _(참고용, 게이트 미반영)_`);
+      md.push(`- **휴리스틱**: ${hName}`);
+      md.push(`- **신뢰도/출처**: ${f.confidence} / ${f.provenance}`);
       md.push(`- **영향 페르소나**: ${f.persona}`);
       md.push(`- **관찰된 증상**: ${f.symptom}`);
       if (f.screenshot) md.push(`- **스크린샷**: ${f.screenshot}`);
@@ -310,6 +373,7 @@ async function main() {
 
   md.push('## 한계');
   md.push('- AI 페르소나는 피로·주의분산 등 인지 노이즈를 재현하지 못한다 → 인간 UT 보완 권장.');
+  md.push('- 게이트(S1~S4)는 **결정론 규칙(UT_HEURISTIC_RUBRIC.md)에 매칭된 findings 만** 반영한다. AI가 자유 판단한 findings 는 advisory 로 분리되어 게이트에 걸리지 않으므로, advisory 건수가 많으면 규칙표 어휘 추가·시나리오 검출기 보강을 검토한다.');
   if (a11ySkipped) md.push('- 접근성 자동 스캔이 비활성(axe 미설치) — WCAG 카운트는 0으로 보고됐다. `npm i -D @axe-core/playwright axe-core` 후 재실행.');
   if (visualStatus === 'not-run') md.push('- 시각적 회귀 diff 미실행 — `node frontend/tests/ut/ut-visual-diff.mjs` 로 이전 실행과 비교하면 레이아웃 회귀를 잡을 수 있다.');
   if (visualStatus === 'skipped') md.push('- 시각적 회귀 diff가 비활성(pixelmatch/pngjs 미설치) — `npm i -D pixelmatch pngjs` 후 재실행.');
