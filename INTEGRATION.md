@@ -15,7 +15,7 @@
 | `.claude/skills/design-handoff.md` | `template/.claude/skills/design-handoff.md` |
 | `.claude/skills/real-ut-intake.md` ⭐신규 | `template/.claude/skills/real-ut-intake.md` |
 | `refs/ux-research/` (11파일 + `real-ut-sessions/` 디렉토리: 기존 10 + `REAL_UT_SESSION_LOG_TEMPLATE.md`) | `template/refs/ux-research/` |
-| `frontend/tests/ut/` (러너 9파일: run-ut·ut-personas·ut-a11y·ut-visual-diff·ut-perf·ut-aggregate·ut-calibrate·ut.config.example·README) | `template/frontend/tests/ut/` |
+| `frontend/tests/ut/` (러너 10 + 계약문서 1 = 11파일: run-ut·ut-personas·ut-heuristics·ut-a11y·ut-visual-diff·ut-perf·ut-aggregate·ut-calibrate·ut.config.example·README·UT_HEURISTIC_RUBRIC) | `template/frontend/tests/ut/` |
 
 ## 2. 기존 파일 덮어쓰기 (4건) — diff 검증 결과
 
