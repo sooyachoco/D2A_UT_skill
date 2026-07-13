@@ -39,15 +39,15 @@
 | 파일 | 판정 | 변경 내용 | 처리 |
 |---|---|---|---|
 | `d2a-mcp-server/src/tools/task-validator.ts` | 🟢 순수 superset (삭제 0줄) | `ut:` 분기 + `checkUtReport()` / `token:` 분기 + `checkTokenReport()` 추가 (규칙 평가는 공유 `evaluateMetricRules()` 로 추출 — `ut:` 동작 불변) | 그대로 덮어쓰기 안전 |
-| `.claude/skills/create-spec.md` | 🟢 superset | Step 0.5(STEP 0 점검 게이트) / Step 2.7.5(AI UT 자동 게이트) / 상태 매트릭스 게이트 삽입 | 그대로 덮어쓰기 안전 |
-| `.claude/skills/pre-launch-check.md` | 🟢 superset (삭제 0줄) | UT_FINDINGS 연계 검증 11줄 삽입 | 그대로 덮어쓰기 안전 |
+| `.claude/skills/create-spec.md` | 🟢 superset | Step 0.5(STEP 0 점검 게이트) / Step 2.7.5(AI UT 자동 게이트) / Step 2.7.6(token-conformance 자동 배선, DESIGN_SYSTEM=nxbasic 전용) / 상태 매트릭스 게이트 삽입 | 그대로 덮어쓰기 안전 |
+| `.claude/skills/pre-launch-check.md` | 🟢 superset (삭제 0줄) | UT_FINDINGS 연계 검증 + 디자인 토큰 준수(조건부) 체크리스트 항목 삽입 | 그대로 덮어쓰기 안전 |
 | `.claude/subagent-templates/accessibility.md` | ⚪ 완전 동일 | 없음 | 복사 불필요(스킵 가능) |
 
 > 검증 방법: `diff <보일러플레이트> <번들>` 에서 삭제(`<`) 라인이 0건임을 확인 — 기존 내용은 전부 보존되고 추가만 발생한다.
 
 ## 3. 정합성 보강 (병합 후 필수)
 
-### 3-1. `template/CLAUDE.md` 스킬 표에 신규 4종 등록
+### 3-1. `template/CLAUDE.md` 스킬 표에 신규 5종 등록
 
 미등록 시 CLAUDE.md 의 스킬 호출 규약("표에 없는 이름은 추정 금지")에 걸려 자동 호출되지 않는다.
 
@@ -62,7 +62,8 @@
 스킬 개수 표기도 갱신한다 (`CLAUDE.md`, `README.md`): `18개 → 23개`.
 
 > `create-spec`·`pre-launch-check` 은 **기존 엔진 스킬을 상위호환으로 덮어쓴 것**이라 신규 등록 대상이 아니다(이미 표에 있음).
-> UT 파이프라인: `create-spec(코딩) → ai-usability-test → (실 UT 있으면 real-ut-intake → ut-calibrate) → design-handoff → run-phase(ut: 게이트)`.
+> UT 파이프라인: `create-spec(코딩) → ai-usability-test → (실 UT 있으면 real-ut-intake → ut-calibrate) → design-handoff → run-phase(ut:/token: 게이트)`.
+> `token:` 은 Step 2.7.6에서 DESIGN_SYSTEM=nxbasic 프로젝트에 한해 **자동 배선**된다(수동으로 tasks.md에 추가할 필요 없음) — §3-3 참조.
 > 페르소나·여정이 필요하면 `ux-research-sync` 로 `refs/ux-research/` SSOT 를 먼저 채운다(가설 페르소나만 있을 때).
 > 실 사용자 세션이 있으면 `real-ut-intake` 로 정규화 후 `node frontend/tests/ut/ut-calibrate.mjs` 로 AI-실측 gap을 확인한다(파라미터 자동 반영 없음 — 사람 검토 필수).
 
@@ -83,7 +84,15 @@ grep -rl "checkTokenReport" dist/   # 같은 파일이 나오면 token: 활성
 `ut:` 와 형제 게이트다. **런타임 관측(ai-usability-test)** 과 달리 **소스 정적 분석**으로 디자인 토큰 준수를 강제한다.
 계약: `frontend/tests/tokens/TOKEN_CONFORMANCE_RUBRIC.md`.
 
-**도입 순서 (전면 강제 금지 — 점진 강제):**
+**기본 경로 — 자동 배선(Step 2.7.6).** DESIGN_SYSTEM=nxbasic 인 프로젝트는 `create-spec` Step 2.7 사용자
+승인(A) 직후 create-spec 이 알아서:
+1. `token-conformance.config.mjs` 부트스트랩 (roots를 `frontend/src`로 좁혀 생성)
+2. `--update-baseline` 최초 1회 실행 (Step 2.7 승인 시점 Mock UI 코드 기준으로 기존 부채 동결)
+3. Step 6에서 생성되는 모든 Phase의 `T{N}-review` 태스크 `done` 에 `token:` 두 줄을 자동 삽입
+
+**즉, `tasks.md` 에 수동으로 `token:` 을 적을 필요가 없다** — 정상 파이프라인(create-spec 을 거쳐 만든 프로젝트)에서는 병합 담당자가 할 일이 없다. 상세: `.claude/skills/create-spec.md` Step 2.7.6 · Step 6 "T{N}-review 태스크 자동 삽입".
+
+**수동 배선이 필요한 예외 케이스만 아래를 따른다** — ①create-spec 이전에 이미 Step 2.7을 통과한 레거시 프로젝트에 소급 적용, ②DESIGN_SYSTEM이 커스텀인데도 팀이 자체 토큰 세트에 이 게이트를 걸고 싶은 경우, ③create-spec 파이프라인 자체를 쓰지 않는 프로젝트:
 
 ```bash
 # 0) 설정 복사·편집 (roots/reportDir/tokenSources)
@@ -94,16 +103,16 @@ node frontend/tests/tokens/token-conformance.mjs --update-baseline
 node frontend/tests/tokens/token-conformance.mjs
 ```
 
-**`tasks.md` done 기준 — 권장: `token:` (선언적, §3-2 재빌드 전제):**
+`tasks.md` done 기준 — 권장: `token:` (선언적, §3-2 재빌드 전제):
 
 ```yaml
 done:
   - token: specs/{NNN}/tokens/TOKEN_CONFORMANCE_REPORT.md :: token_coverage>=90,token_violations=0
 ```
 
-`ut:` 와 동일한 파싱·평가 엔진(`evaluateMetricRules()`)을 공유해 `done` 기준 문법이 일관되고, tasks.md 에 CLI 플래그를 손으로 박을 필요가 없다.
+`ut:` 와 동일한 파싱·평가 엔진(`evaluateMetricRules()`)을 공유해 `done` 기준 문법이 일관된다.
 
-**대안: `cmd:` self-contained (MCP 하네스 자체를 안 쓰는 프로젝트 전용)** — §3-2 재빌드를 아예 거치지 않는 프로젝트(D2A MCP 미도입)에서만 이걸 쓴다. 그 외엔 위 `token:` 을 쓴다.
+대안 — `cmd:` self-contained (MCP 하네스 자체를 안 쓰는 프로젝트 전용, §3-2 재빌드를 아예 거치지 않는 경우):
 
 ```yaml
 done:
@@ -111,7 +120,7 @@ done:
 ```
 
 **지표**: `token_coverage`(토큰 참조 비율%) · `token_violations`(신규 하드코딩 건수, baseline 초과분) — 나머지는 `token-conformance.md`·규칙표 §5 참조.
-`baseline` 미생성 시 모든 하드코딩이 신규 위반으로 잡히므로, 최초 도입 시 `--update-baseline` 을 반드시 먼저 실행한다.
+`baseline` 미생성 시 모든 하드코딩이 신규 위반으로 잡히므로, 자동/수동 어느 경로든 `--update-baseline` 이 먼저 실행돼야 한다.
 
 ## 4. 병합 검증 체크리스트
 
@@ -120,5 +129,5 @@ done:
 - [ ] `CLAUDE.md` 스킬 표 5종 등록 + 개수 23개
 - [ ] `dist/` 재빌드 → `checkUtReport` + `checkTokenReport` 반영 확인
 - [ ] `tasks.md` 의 `done` 에 `ut: {리포트} :: S4=0,S3<=2` 사용 가능
-- [ ] `token-conformance` 도입: `token-conformance.config.mjs` 편집 → `--update-baseline` 1회 → `token: … :: token_coverage>=N,token_violations<=N` done 등록 (MCP 하네스 미도입 시에만 `cmd: … --gate` 대안)
+- [ ] `token-conformance`: DESIGN_SYSTEM=nxbasic 프로젝트는 create-spec Step 2.7.6이 자동 배선(설정·baseline·tasks.md `token:` 삽입까지 자동) — 병합 담당자는 별도 조치 불필요. 예외 케이스(레거시 소급/커스텀 디자인 시스템/create-spec 미사용)만 수동으로 `token-conformance.config.mjs` 편집 → `--update-baseline` 1회 → `token: … :: token_coverage>=N,token_violations<=N` done 등록
 - [ ] (선택) 실 UT 세션 확보 시 `real-ut-intake` → `ut-calibrate.mjs` 캘리브레이션 루프 동작 확인

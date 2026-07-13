@@ -18,7 +18,7 @@ last_updated: 2026-07-13 (신설 — NX Basic 색상 변수 + type 유틸 클래
 | ① UI/UX 일관성 붕괴(화면마다 색상·폰트·여백 제각각) | **직접 차단** — 하드코딩 검출 |
 | ② 디자인 부채 누적(즉흥 컴포넌트·중복 스타일 반복) | **직접 차단** — baseline 이후 신규 부채 원천 차단 |
 | ③ 개발 생산성 저하 / ④ 유지보수 난이도 증가 | 간접 — 토큰 참조 강제로 재사용·영향범위 예측 유도 |
-| ⑤ SDD 전환 불가(UI 명세 비구조화) | 간접 — `token-metrics` 가 `create-spec` `done` 기준(`token:`)에 편입 |
+| ⑤ SDD 전환 불가(UI 명세 비구조화) | 간접 — `create-spec` Step 2.7.6이 `token-metrics` 를 `done` 기준(`token:`)에 **자동 편입**(DESIGN_SYSTEM=nxbasic 전용, 수동 배선 불필요) |
 
 ## 무엇을 검출하나 (NX Basic 전제)
 
@@ -67,12 +67,24 @@ node frontend/tests/tokens/token-conformance.mjs --gate token_coverage>=90,token
 
 ## Phase 게이트 통합 (MCP done 기준)
 
-**권장: `token:` 타입** (`tasks.md` 의 `done` 에 선언). `ut:` 와 동일한 파싱·평가 엔진을 공유해 문법이 일관되고, 임계값이 tasks.md 에 CLI 플래그가 아니라 선언으로 남는다.
-전제: MCP `dist/` 재빌드 — 단, 이 재빌드는 `ut:` 게이트 때문에 **이미 필수 스텝**이므로(`INTEGRATION.md` §3-2), `token:` 을 추가하는 데 드는 한계비용은 0에 가깝다.
+**기본 경로 — 자동 배선(수동 작성 불필요).** DESIGN_SYSTEM=nxbasic 프로젝트는 `create-spec` Step 2.7.6이
+사용자가 Step 2.7(화면구성)에서 UI를 승인하는 순간 다음을 전부 자동 처리한다:
+1. `token-conformance.config.mjs` 부트스트랩
+2. `--update-baseline` 최초 1회 실행(Step 2.7 승인 시점 코드 기준으로 기존 부채 동결)
+3. Step 6에서 생성되는 **모든 Phase의 `T{N}-review` 태스크** `done` 에 아래 두 줄을 자동 삽입
 
 ```yaml
 done:
   - cmd: node frontend/tests/tokens/token-conformance.mjs
+  - token: specs/{NNN}/tokens/TOKEN_CONFORMANCE_REPORT.md :: token_coverage>=90,token_violations=0
+```
+
+`ut:` 와 동일한 파싱·평가 엔진(`evaluateMetricRules`)을 공유해 문법이 일관된다. 상세: `create-spec.md` Step 2.7.6 · Step 6 "T{N}-review 태스크 자동 삽입".
+
+**수동 배선(예외 케이스만)** — create-spec 이전에 이미 화면구성을 마친 레거시 프로젝트, DESIGN_SYSTEM이 커스텀인데 자체 토큰에 이 게이트를 걸고 싶은 경우, 또는 create-spec 파이프라인을 쓰지 않는 프로젝트. MCP `dist/` 재빌드 전제(`ut:` 게이트 때문에 이미 필수 스텝이므로 한계비용은 0에 가깝다 — `INTEGRATION.md` §3-2):
+
+```yaml
+done:
   - token: specs/{NNN}/tokens/TOKEN_CONFORMANCE_REPORT.md :: token_coverage>=90,token_violations=0
 ```
 

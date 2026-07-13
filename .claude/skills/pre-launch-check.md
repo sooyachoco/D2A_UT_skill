@@ -26,10 +26,16 @@ B) 유저용 서비스 (인터넷 공개, 외부 사용자)
 | 2 | QA 테스트 | ☐ 선택 | ⬜ |
 | 3 | 접근성 검수 | ☐ 권장 | ⬜ |
 | 4 | 운영 이관 문서 (README) | ☐ 필수 | ⬜ |
+| 5 | 디자인 토큰 준수 (DESIGN_SYSTEM=nxbasic 인 경우만) | ☐ 조건부 필수 | ⬜ |
 
 > **접근성 검수 처리 방침 (사내 도구)**:
 > `specs/{NNN}/ut/UT_FINDINGS_REPORT.md`의 "기술적 접근성 이슈" 섹션이 존재하면 그 결과로 갈음한다.
 > 파일이 없으면 `ai-usability-test 실행해줘`로 먼저 자동 1차 필터링을 수행한다.
+
+> **디자인 토큰 준수 처리 방침**: `state.json.design_system == "nxbasic"` 인 프로젝트만 해당한다(그 외엔 5번 항목 자체를 N/A 처리).
+> Step 2.7.6에서 배선된 `token:` 게이트가 매 Phase review마다 이미 확인해왔으므로, 여기서는
+> `specs/{NNN}/tokens/TOKEN_CONFORMANCE_REPORT.md`의 `token_violations=0` 최종 확인만 하면 된다.
+> 리포트가 없거나 오래됐으면(`node frontend/tests/tokens/token-conformance.mjs`) 재실행 후 확인한다.
 
 ## Step 2-B: 유저용 서비스 체크리스트
 
@@ -41,6 +47,7 @@ B) 유저용 서비스 (인터넷 공개, 외부 사용자)
 | 4 | 법무 검토 (이용약관, 개인정보처리방침) | ☑ 필수 | ⬜ |
 | 5 | 접근성 검수 (WCAG AA) | ☑ 필수 | ⬜ |
 | 6 | 운영 이관 문서 (가이드+장애대응 매뉴얼) | ☑ 필수 | ⬜ |
+| 7 | 디자인 토큰 준수 (DESIGN_SYSTEM=nxbasic 인 경우만) | ☑ 조건부 필수 | ⬜ |
 
 > **접근성 검수 처리 방침 (유저용 서비스)**:
 > 1단계 — `specs/{NNN}/ut/UT_FINDINGS_REPORT.md` 확인: "기술적 접근성 이슈" 섹션이 있으면
@@ -48,6 +55,10 @@ B) 유저용 서비스 (인터넷 공개, 외부 사용자)
 > 2단계 — S4/S3 접근성 이슈가 있거나 UT 결과 파일이 없으면 `design:accessibility-review`로
 >   심층 리뷰를 수행한다.
 > → 자동화(`ai-usability-test`)가 1차 필터, `design:accessibility-review`가 2차 심층 검토.
+
+> **디자인 토큰 준수 처리 방침**: `state.json.design_system == "nxbasic"` 인 프로젝트만 해당한다(그 외엔 7번 항목 N/A).
+> Step 2.7.6에서 배선된 `token:` 게이트가 매 Phase review마다 이미 확인해왔으므로, 여기서는
+> `specs/{NNN}/tokens/TOKEN_CONFORMANCE_REPORT.md`의 `token_violations=0` 최종 확인만 하면 된다.
 
 추가 확인:
 - WAF + DDoS 방어 설정
