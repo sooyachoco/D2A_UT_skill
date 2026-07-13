@@ -1,8 +1,9 @@
 # D2A UT (사용성 테스트) Skill Bundle
 
 D2A 보일러플레이트의 **AI 네이티브 사용성 테스트(UT) 검증** 기능 묶음 — 본체([D2A_UX_UI](https://github.com/sooyachoco/D2A_UX_UI))에서 **UT 자동 검증과 그 근거·게이트**에 해당하는 스킬·에이전트·데이터만 추출한 저장소.
+런타임 관측(`ai-usability-test`)에 더해, **소스 정적 분석으로 디자인 토큰(색상·타이포) 준수를 강제하는 `token-conformance` 게이트**도 포함한다.
 > 출처 작업 기록: Notion — "🦍 AI 네이티브 사용성 테스트 스킬 구축"
-> 이 번들은 **UT 전용**이다. 화면설계(상류) 스킬(`write-scenario`·`reference-proposal`·`ui-design-workflow`·`ux-audit`)은 포함하지 않는다.
+> 이 번들은 **UT·품질 게이트 전용**이다. 화면설계(상류) 스킬(`write-scenario`·`reference-proposal`·`ui-design-workflow`·`ux-audit`)은 포함하지 않는다.
 
 ## 전체 그림
 
@@ -22,6 +23,14 @@ D2A 보일러플레이트의 **AI 네이티브 사용성 테스트(UT) 검증** 
         ▼                                     ▼
  refs/ux-research/real-ut-sessions/    CALIBRATION_REPORT.md
  (scenario-id별 누적, 신뢰도 등급)      (calibrated 여부 표시)
+
+[병렬 · 정적] 소스 코드 자체를 스캔 — 런타임 없이 항상 동작
+ token-conformance
+ (색상·타이포 하드코딩 정적 스캔) ──▶ MCP `token:` done 게이트
+        │                                     (baseline 초과 신규 위반 → Phase 자동 차단)
+        ▼
+ TOKEN_CONFORMANCE_REPORT.md + token-baseline.json
+ (신규 위반 vs 기존 부채 분리)
 ```
 
 사람이 눈으로 보던 UX 검수를, **코드가 숫자로 검사해 자동으로 막는 강제 게이트**로 전환한 묶음이다.
@@ -35,7 +44,7 @@ D2A 보일러플레이트의 **AI 네이티브 사용성 테스트(UT) 검증** 
 ## 🔧 보일러플레이트 엔진과 병합 셋업
 
 이 번들은 **단독 실행용이 아니라** D2A 보일러플레이트(엔진, `d2a-boilerplate-claude`) 위에 얹는 **오버레이**다.
-아래 스텝이면 엔진에 UX 리서치 SSOT + `ut:` 강제 게이트 + UT 스킬 4종이 활성화된다.
+아래 스텝이면 엔진에 UX 리서치 SSOT + `ut:`/`token:` 강제 게이트 + 스킬 5종이 활성화된다.
 
 ```
 # 0) 엔진(보일러플레이트) 준비 — 없으면 먼저 설치
@@ -53,21 +62,26 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 
 **설치기가 자동으로 하는 것**
 
-1. 신규 파일 복사 — UT 스킬 4종(`ux-research-sync`·`ai-usability-test`·`design-handoff`·`real-ut-intake`) + `refs/ux-research/`(SSOT 11종) + `frontend/tests/ut/run-ut.mjs`·`ut-calibrate.mjs` + `accessibility` 서브에이전트
+1. 신규 파일 복사 — UT/게이트 스킬 5종(`ux-research-sync`·`ai-usability-test`·`design-handoff`·`real-ut-intake`·`token-conformance`) + `refs/ux-research/`(SSOT 11종) + `frontend/tests/ut/run-ut.mjs`·`ut-calibrate.mjs` + `frontend/tests/tokens/token-conformance.mjs` + `accessibility` 서브에이전트
 2. 충돌 파일 덮어쓰기(상위호환) — `create-spec.md`·`pre-launch-check.md`·`task-validator.ts` (기존은 `.bak-<timestamp>` 백업)
-3. **MCP 자동 재빌드** — `task-validator.ts` 를 덮어썼으므로 `d2a-mcp-server` 를 `npm install && npm run build` 재빌드해 **`ut:` 게이트를 활성화**(구버전 `dist/` 가 게이트를 조용히 죽이는 것 방지)
+3. **MCP 자동 재빌드** — `task-validator.ts` 를 덮어썼으므로 `d2a-mcp-server` 를 `npm install && npm run build` 재빌드해 **`ut:`/`token:` 게이트를 활성화**(구버전 `dist/` 가 게이트를 조용히 죽이는 것 방지)
 
-**남은 수동 2스텝 (병합 후 정합성)** 4. `CLAUDE.md` **스킬 표에 신규 4종 등록** + 스킬 수 표기 **18개 → 22개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공). `create-spec`·`pre-launch-check` 은 기존 엔진 스킬 덮어쓰기라 신규 등록 대상이 아니다.
+**남은 수동 3스텝 (병합 후 정합성)**
+
+4. `CLAUDE.md` **스킬 표에 신규 5종 등록** + 스킬 수 표기 **18개 → 23개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공). `create-spec`·`pre-launch-check` 은 기존 엔진 스킬 덮어쓰기라 신규 등록 대상이 아니다.
 5. 프로젝트 시작 시 **`ux-research-sync 실행해줘`** 로 SSOT(페르소나·여정·과업)를 실제 데이터로 채움 (채우기 전엔 전 항목 🔵 가설)
+6. `token-conformance` 도입 시 **baseline 동결 1회 필수** — `node frontend/tests/tokens/token-conformance.mjs --update-baseline` (건너뛰면 기존 하드코딩이 전부 신규 위반으로 잡혀 게이트가 즉시 막힘)
 
 **병합 검증 (선택)**
 
 ```
-grep -c 'ut:' d2a-mcp-server/src/tools/task-validator.ts   # >0 (게이트 존재)
-grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
+grep -c 'ut:' d2a-mcp-server/src/tools/task-validator.ts      # >0 (ut: 게이트 존재)
+grep -c 'token:' d2a-mcp-server/src/tools/task-validator.ts   # >0 (token: 게이트 존재)
+grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut 게이트 빌드됨"
+grep -rlq checkTokenReport d2a-mcp-server/dist && echo "token 게이트 빌드됨"
 ```
 > 파일별 병합 판정(상위호환/동일)·경로 매핑·CLAUDE.md 등록 스니펫 상세는 [`INTEGRATION.md`](https://github.com/sooyachoco/D2A_UT_skill/blob/main/INTEGRATION.md) 참조.
-> 병합이 끝나면 파이프라인은 `create-spec(코딩) → ai-usability-test → (실 UT 있으면 real-ut-intake → ut-calibrate) → design-handoff → run-phase(ut: 게이트)` 로 흐른다.
+> 병합이 끝나면 파이프라인은 `create-spec(코딩) → ai-usability-test → (실 UT 있으면 real-ut-intake → ut-calibrate) → design-handoff → run-phase(ut:/token: 게이트)` 로 흐른다. `token-conformance` 는 런타임과 무관하게 소스만으로 언제든 병렬 실행 가능하다.
 
 ## 구성
 
@@ -79,6 +93,7 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 | `ux-research-sync.md`  | 실제 리서치 데이터를 MCP로 연결 → 신뢰도 3단계(🟢검증/🟢인접/🔵가설)로 ux-research 주입. UT 페르소나의 단일 source 공급                                           |
 | `real-ut-intake.md` ⭐신규 | 실 사용자 세션 원본(녹화·노트)을 `UT_OBSERVATION_SHEET.md` 와 동일 스키마로 정규화해 `real-ut-sessions/` 에 저장. 세션을 만들지 않고 정규화만 담당(모집·동의·진행은 범위 밖) |
 | `design-handoff.md`    | **(종착)** UT 통과(S4=0) 후 개발 핸드오프 스펙 생성. `design:design-handoff` 플러그인을 엔진으로 호출(없으면 폴백), 앞 단계 산출물을 묶어 `HANDOFF.md`로 출력. 새 결정 금지 |
+| `token-conformance.md` ⭐신규 | **(병렬 · 정적)** 색상·타이포 하드코딩을 소스 정적 분석으로 검출해 디자인 토큰 준수를 배포 게이트로 강제. baseline 으로 기존 부채는 면제하고 신규 위반만 차단. MCP `token:` done 기준 |
 | `create-spec.md`       | (엔진 상위호환) spec/plan/tasks 생성. Step 0.5(STEP 0 점검) + Step 2.7.5(AI UT 자동 게이트) 포함                                             |
 | `pre-launch-check.md`  | (엔진 상위호환) 배포 전 검증 체크리스트 (UT\_FINDINGS\_REPORT 갈음 규칙 연동)                                                                     |
 
@@ -125,6 +140,20 @@ grep -rlq checkUtReport d2a-mcp-server/dist && echo "ut게이트 빌드됨"
 | `frontend/tests/ut/ut-calibrate.mjs` ⭐신규     | `real-ut-sessions/{scenario-id}/*.md` 와 `raw-observations.json` 을 scenario-id 기준으로 비교해 완료율·소요시간 gap을 계산하고, `ut-personas.mjs` 파라미터 조정 제안이 담긴 `CALIBRATION_REPORT.md` 를 생성. 파라미터 자동 반영은 하지 않음(사람 검토 필수) |
 | `frontend/tests/ut/ut.config.example.mjs`    | 시나리오 정의 예시 (`ut.config.mjs` 로 복사)                                                                                                                                                                |
 
+### 5. MCP `token:` 강제 게이트 (신규 — 소스 정적 분석)
+
+`ut:` 와 형제 게이트다. **런타임 관측(Playwright)** 없이 **소스 코드만 스캔**해 색상·타이포 하드코딩을 검출한다. 계약 전문: [`frontend/tests/tokens/TOKEN_CONFORMANCE_RUBRIC.md`](frontend/tests/tokens/TOKEN_CONFORMANCE_RUBRIC.md).
+
+| 파일 | 역할 |
+| --- | --- |
+| `d2a-mcp-server/src/tools/task-validator.ts` | `checkTokenReport` — `done` 기준의 `token: {리포트} :: token_coverage>=90,token_violations=0` 평가. `ut:` 와 파싱·평가 엔진(`evaluateMetricRules`) 공유 |
+| `frontend/tests/tokens/token-conformance.mjs` ⭐신규 | 정적 스캐너 — 색상 hex/rgb/hsl·하드코딩 font-size 검출, baseline(기존 부채) 대비 신규 위반만 집계, `TOKEN_CONFORMANCE_REPORT.md` 생성. 외부 의존 없음(순수 Node) |
+| `frontend/tests/tokens/TOKEN_CONFORMANCE_RUBRIC.md` ⭐신규 | **판정 계약** — 위반 어휘→카테고리→severity→provenance→baseline 규칙표. `UT_HEURISTIC_RUBRIC.md` 와 동일 원칙(결정론 검출만 게이트, 나머지는 advisory) |
+| `frontend/tests/tokens/token-conformance.config.example.mjs` ⭐신규 | 스캔 대상(roots)·토큰 변수 프리픽스(`--color-*`/`--semantic-*`)·게이트 임계 설정 예시 (`token-conformance.config.mjs` 로 복사) |
+| `frontend/tests/tokens/README.md` ⭐신규 | 빠른 시작·CLI 옵션(`--update-baseline`/`--gate`/`--json`) 안내 |
+
+NX Basic 토큰 체계 전제 — 색상은 `var(--color-*)`/`var(--semantic-*)` CSS 변수, 타이포는 `.type-default-16` 등 유틸 클래스로 소비된다. **spacing 토큰은 아직 없어 이 게이트 범위 밖.**
+
 ## `ut:` done 기준
 
 `tasks.md` 의 `done` 항목에서 사용:
@@ -140,6 +169,26 @@ S1~S4 · 완료율(`complete`) · 접근성 위반(`wcag`) · 시각적 회귀(`
 
 **휴리스틱 판정 계약 (신규)**: severity 분류는 [`UT_HEURISTIC_RUBRIC.md`](frontend/tests/ut/UT_HEURISTIC_RUBRIC.md) 계약을 따른다. `errorType` 이 규칙표에 등재된 findings 만 **결정론 규칙(provenance=rule)** 으로 게이트(S1~S4)에 반영하고, 규칙표에 없이 LLM 이 자유 라벨링한 findings 는 **advisory** 로 분리해 게이트에서 제외한다(리포트엔 표시). AI 의 "좋다/나쁘다" 자유 판단을 게이트 근거로 쓰지 않기 위한 장치다 — 개선안(REDESIGN)도 자유 생성 대신 카탈로그 기반 **가설**로 다루며 검증 전 배포하지 않는다.
 리포트 부재·지표 미검출 시 **실패 처리**(UT 미실행을 통과로 오인 방지).
+
+## `token:` done 기준 (신규)
+
+`tasks.md` 의 `done` 항목에서 사용 — **권장 경로**. MCP 재빌드가 전제지만, `ut:` 때문에 이미 필수 스텝이라 한계비용은 0에 가깝다.
+
+```
+done:
+  - token: specs/001-xxx/tokens/TOKEN_CONFORMANCE_REPORT.md :: token_coverage>=90,token_violations=0
+```
+
+`ut:` 와 동일한 파싱·평가 엔진(`evaluateMetricRules`)으로 `token-metrics` 주석에서 지표를 추출해 검증한다: 토큰 참조 비율(`token_coverage`) · **신규** 하드코딩 건수(`token_violations`, baseline 초과분) · 전체/면제 하드코딩(`token_hardcoded`/`token_baseline`) · 게이트 제외 findings(`token_advisory`) · 축별 커버리지(`color_coverage`/`type_coverage`).
+
+**대안 — `cmd:` self-contained**: D2A MCP 하네스 자체를 도입하지 않아 재빌드를 거치지 않는 프로젝트에서만 사용한다.
+```
+done:
+  - cmd: node frontend/tests/tokens/token-conformance.mjs --gate token_coverage>=90,token_violations=0
+```
+
+**baseline 필수**: 최초 도입 시 `node frontend/tests/tokens/token-conformance.mjs --update-baseline` 를 먼저 실행해 기존 하드코딩(예: 참조 컴포넌트의 `#fff`·`#1f8a30`·`#c33636` 이탈)을 면제하지 않으면, 전면 강제로 게이트가 즉시 막힌다. 이후엔 **baseline 초과분(신규 위반)만** 차단한다.
+리포트 부재·지표 미검출 시 **실패 처리**(게이트 미실행을 통과로 오인 방지).
 
 ## Severity 분류 (Nielsen)
 
@@ -191,13 +240,14 @@ bash install.sh <d2a-boilerplate-claude 경로>          # macOS/Linux/Git Bash
 pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 ```
 
-설치기는 신규 파일을 복사하고 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은 `.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:` 게이트 활성화를 위해 MCP 를 자동 재빌드**한다
+설치기는 신규 파일을 복사하고(`frontend/tests/tokens/` 포함) 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은 `.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:`/`token:` 게이트 활성화를 위해 MCP 를 자동 재빌드**한다
 (`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내). 끝나면 콘솔이 남은 수동 단계를 안내한다:
 
-1. `CLAUDE.md` 스킬 표에 신규 4종(`ux-research-sync`/`ai-usability-test`/`design-handoff`/`real-ut-intake`) 등록 + 개수 22개
+1. `CLAUDE.md` 스킬 표에 신규 5종(`ux-research-sync`/`ai-usability-test`/`design-handoff`/`real-ut-intake`/`token-conformance`) 등록 + 개수 23개
+2. `token-conformance` 도입 시 `node frontend/tests/tokens/token-conformance.mjs --update-baseline` 1회 실행(기존 하드코딩 면제 — 건너뛰면 게이트가 즉시 막힘)
 
 > MCP 빌드는 보일러플레이트 초기 셋업의 빌드와 동일한 작업이다. 설치기가 덮어쓴 직후 자동 재실행해
-> 구버전 `dist/` 가 남지 않도록 보장한다(`ut:` 게이트가 조용히 죽는 것을 방지).
+> 구버전 `dist/` 가 남지 않도록 보장한다(`ut:`/`token:` 게이트가 조용히 죽는 것을 방지).
 > 파일별 병합 판정(상위호환/동일)·경로 매핑 상세는 [`INTEGRATION.md`](https://github.com/sooyachoco/D2A_UT_skill/blob/main/INTEGRATION.md) 참조.
 
 ## 통합
@@ -210,3 +260,4 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 - 화면설계(상류) 스킬은 이 번들에서 제외됐다. 설계 단계가 필요하면 별도 설계 번들을 함께 얹거나, `refs/ux-research/` SSOT + 외부 설계 산출물(`scenario.md`·`reference-board.md`)을 입력으로 제공한다.
 - `refs/ux-research/` 10종(+ 신규 세션 로그 체계)은 **빈 템플릿**으로 배포된다. 특정 서비스의 실데이터는 포함하지 않으며, `ux-research-sync` 스킬이 프로젝트 시작 시 실제 리서치 데이터로 채운다.
 - `real-ut-intake`·`ut-calibrate.mjs` 는 **실 사용자 세션을 만들어내지 않는다.** 참가자 모집·동의서·스크리닝·세션 진행은 리서치 패널·외부 툴(Maze/UserTesting/Dovetail 등)·사내 리서치팀의 몫이며, 이 번들은 그 결과물을 AI 시뮬레이션과 비교 가능한 형태로 표준화하는 것까지만 담당한다.
+- `token-conformance` 는 **색상·타이포만** 다룬다(spacing 토큰이 NX Basic 에 아직 없어 범위 밖). 컴포넌트 재사용·표준화 자체는 디자인 시스템 운영의 몫이며, 이 게이트는 "코드에 박힌 하드코딩을 신규로는 더 안 늘어나게" 막는 것까지만 담당한다 — 왜 이 게이트가 필요한지는 [`TOKEN_CONFORMANCE_RUBRIC.md`](frontend/tests/tokens/TOKEN_CONFORMANCE_RUBRIC.md) §0 참조.

@@ -29,6 +29,7 @@ $overlay = @(
   ".claude/subagent-templates",
   "refs/ux-research",
   "frontend/tests/ut",
+  "frontend/tests/tokens",
   "d2a-mcp-server/src/tools/task-validator.ts"
 )
 
@@ -37,11 +38,17 @@ function Copy-One($rel) {
   $dst = Join-Path $Dest $rel
   if (Test-Path $src -PathType Container) {
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
-    Get-ChildItem -File $src | ForEach-Object {
+    Get-ChildItem $src | ForEach-Object {
       $target = Join-Path $dst $_.Name
-      if (Test-Path $target) { Copy-Item $target "$target.bak-$ts"; Write-Host "  ⤷ 백업: $rel/$($_.Name).bak-$ts" }
-      Copy-Item $_.FullName $target -Force
-      Write-Host "  ✓ $rel/$($_.Name)"
+      if ($_.PSIsContainer) {
+        # 중첩 디렉토리(예: real-ut-sessions/)는 재귀 복사 — 신규 디렉토리라 백업 불필요
+        Copy-Item $_.FullName $target -Recurse -Force
+        Write-Host "  ✓ $rel/$($_.Name)/ (디렉토리)"
+      } else {
+        if (Test-Path $target) { Copy-Item $target "$target.bak-$ts"; Write-Host "  ⤷ 백업: $rel/$($_.Name).bak-$ts" }
+        Copy-Item $_.FullName $target -Force
+        Write-Host "  ✓ $rel/$($_.Name)"
+      }
     }
   } else {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
@@ -56,10 +63,10 @@ foreach ($item in $overlay) { Copy-One $item }
 Write-Host ""
 Write-Host "✅ 파일 복사 완료."
 
-# task-validator.ts 를 덮어썼으므로 MCP 를 재빌드해 ut: 게이트를 반영한다.
+# task-validator.ts 를 덮어썼으므로 MCP 를 재빌드해 ut:/token: 게이트를 반영한다.
 $McpDir = Join-Path $Dest "d2a-mcp-server"
 Write-Host ""
-Write-Host "→ MCP 재빌드 (ut: 게이트 활성화)…"
+Write-Host "→ MCP 재빌드 (ut:/token: 게이트 활성화)…"
 $npm = Get-Command npm -ErrorAction SilentlyContinue
 if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
   try {
@@ -67,10 +74,13 @@ if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
     npm install --silent
     npm run build --silent
     Pop-Location
-    if (Get-ChildItem -Recurse (Join-Path $McpDir "dist") -ErrorAction SilentlyContinue | Select-String -Quiet "checkUtReport") {
-      Write-Host "  ✓ MCP 빌드 완료 — ut: 게이트 활성"
+    $dist = Join-Path $McpDir "dist"
+    $hasUt = Get-ChildItem -Recurse $dist -ErrorAction SilentlyContinue | Select-String -Quiet "checkUtReport"
+    $hasToken = Get-ChildItem -Recurse $dist -ErrorAction SilentlyContinue | Select-String -Quiet "checkTokenReport"
+    if ($hasUt -and $hasToken) {
+      Write-Host "  ✓ MCP 빌드 완료 — ut:/token: 게이트 활성"
     } else {
-      Write-Host "  ⚠️  빌드는 됐으나 dist 에 checkUtReport 미검출 — 수동 확인 필요"
+      Write-Host "  ⚠️  빌드는 됐으나 dist 에 checkUtReport/checkTokenReport 미검출 — 수동 확인 필요"
     }
   } catch {
     Pop-Location -ErrorAction SilentlyContinue
@@ -81,11 +91,17 @@ if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
 }
 
 Write-Host ""
-Write-Host "남은 수동 1단계:"
-Write-Host "[*] CLAUDE.md 스킬 표에 신규 3종 등록 + 스킬 수 표기 18개 → 21개"
+Write-Host "남은 수동 2단계:"
+Write-Host "[*] CLAUDE.md 스킬 표에 신규 5종 등록 + 스킬 수 표기 18개 → 23개"
 Write-Host "      /ux-research-sync   외부 리서치 데이터를 refs/ux-research SSOT에 3단계 신뢰도로 적재"
 Write-Host "      /ai-usability-test  Playwright 3 페르소나 자동 사용성 테스트 → UT_FINDINGS_REPORT.md"
+Write-Host "      /real-ut-intake     실 사용자 UT 세션 원본을 AI 관측 스키마로 정규화"
 Write-Host "      /design-handoff     UT 통과(S4=0) 후 개발 핸드오프 스펙 생성 (HANDOFF.md)"
+Write-Host "      /token-conformance  디자인 토큰(색상·타이포) 준수 정적 분석 게이트 → TOKEN_CONFORMANCE_REPORT.md"
 Write-Host "    (create-spec·pre-launch-check 은 기존 엔진 스킬 상위호환 덮어쓰기 — 신규 등록 아님)"
+Write-Host ""
+Write-Host "[*] token-conformance 도입 시 baseline 동결 1회 필수:"
+Write-Host "      node frontend/tests/tokens/token-conformance.mjs --update-baseline"
+Write-Host "      (안 하면 기존 하드코딩이 전부 신규 위반으로 잡혀 게이트가 막힌다)"
 Write-Host ""
 Write-Host "자세한 병합 판정·매핑은 INTEGRATION.md 참조."
