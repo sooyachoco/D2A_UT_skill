@@ -1,4 +1,4 @@
-<#
+﻿<#
   D2A UT (사용성 테스트) Skill Bundle 설치기 (Windows / PowerShell)
   이 번들의 오버레이 파일을 d2a-boilerplate-claude 의 template/ 에 복사한다.
 
@@ -12,6 +12,10 @@
 param([Parameter(Mandatory=$true)][string]$Target)
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Windows PowerShell 5.1 은 콘솔 출력 인코딩이 기본적으로 시스템 코드페이지(예: 949)라, 이 파일이
+# UTF-8(BOM)로 저장돼 있어도 Write-Host 의 한글이 콘솔에 깨져 나온다. UTF-8 로 강제 출력한다.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() } catch {}
 
 if (Test-Path (Join-Path $Target "template")) {
   $Dest = Join-Path $Target "template"
