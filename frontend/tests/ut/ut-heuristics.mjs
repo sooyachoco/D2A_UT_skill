@@ -36,10 +36,12 @@ export async function checkKeyboardReachable(persona, predicate, { label, maxTab
 }
 
 /** 파괴적 액션 트리거 후 확인 절차(다이얼로그 등)가 뜨는가 (N5). */
-export async function checkDestructiveConfirm(page, persona, triggerSelector, confirmSelector, { label } = {}) {
+export async function checkDestructiveConfirm(page, persona, triggerSelector, confirmSelector, { label, timeoutMs = 800 } = {}) {
   const act = await persona.activate(triggerSelector, { label }).catch(() => ({ ok: false }));
   if (!act.ok) return null; // 트리거 자체 실패는 다른 검출기 범위
-  const hasConfirm = await page.locator(confirmSelector).first().isVisible().catch(() => false);
+  // isVisible() 은 auto-wait 하지 않는다 — checkLoadingFeedback 과 동일하게 waitFor 로 렌더 지연을 흡수한다.
+  const hasConfirm = await page.locator(confirmSelector).first()
+    .waitFor({ state: 'visible', timeout: timeoutMs }).then(() => true).catch(() => false);
   if (hasConfirm) return null;
   return {
     action: 'heuristic-check', completed: false, isError: true,
@@ -49,9 +51,11 @@ export async function checkDestructiveConfirm(page, persona, triggerSelector, co
 }
 
 /** 잘못된 입력 제출 시 인라인 오류 메시지(복구 안내)가 표시되는가 (N9). */
-export async function checkFormErrorRecovery(page, persona, submitSelector, errorSelector, { label } = {}) {
+export async function checkFormErrorRecovery(page, persona, submitSelector, errorSelector, { label, timeoutMs = 800 } = {}) {
   await persona.activate(submitSelector, { label }).catch(() => {});
-  const hasError = await page.locator(errorSelector).first().isVisible().catch(() => false);
+  // isVisible() 은 auto-wait 하지 않는다 — checkLoadingFeedback 과 동일하게 waitFor 로 렌더 지연을 흡수한다.
+  const hasError = await page.locator(errorSelector).first()
+    .waitFor({ state: 'visible', timeout: timeoutMs }).then(() => true).catch(() => false);
   if (hasError) return null;
   return {
     action: 'heuristic-check', completed: false, isError: true,

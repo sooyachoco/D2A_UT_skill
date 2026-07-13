@@ -128,6 +128,19 @@ async function main() {
       netErrs.push({ persona: personaId, scenario: scenario.id, kind: 'failed', status: 0, method: req.method(), url, failure: req.failure()?.errorText || '' });
     });
 
+    // 인증 리다이렉트는 goto() 호출뿐 아니라 시나리오 중 클릭(persona.activate)으로도 발생할 수 있다
+    // (예: 세션이 중간에 만료되어 보호된 링크 클릭이 로그인 화면으로 튐). goto() 래퍼만 감시하면
+    // 이런 경우 감지가 안 돼 심각한 auth-redirect(S4)가 평범한 exception(S3)으로 과소평가된다.
+    // 메인 프레임 네비게이션을 전부 감시해 어떤 경로로 리다이렉트됐든 잡는다.
+    let authRedirectHost = null;
+    page.on('framenavigated', (frame) => {
+      if (frame !== page.mainFrame()) return;
+      try {
+        const host = new URL(frame.url()).host;
+        if (guardHosts.some((h) => host.includes(h))) authRedirectHost = host;
+      } catch { /* about:blank 등 URL 파싱 불가 프레임은 무시 */ }
+    });
+
     const persona = makePersona(page, personaId);
     const t0 = Date.now();
     let maxHesitation = 0;
@@ -154,13 +167,17 @@ async function main() {
     try {
       await scenario.run({ page, persona, base, rec, shot, goto, config, root: ROOT });
     } catch (e) {
-      const isAuth = e instanceof AuthRedirectError;
+      // goto() 를 거치지 않고 클릭 등으로 인증 화면에 도달했어도 authRedirectHost 로 잡는다.
+      const isAuth = e instanceof AuthRedirectError || !!authRedirectHost;
       abortedByAuth = isAuth;
       rec({
         action: 'scenario-run', completed: false, isError: true,
         errorType: isAuth ? 'auth-redirect' : 'exception',
         severityHint: isAuth ? 'S4' : undefined,
-        hesitationMs: maxHesitation, screenshotPath: await shot('error'), note: e.message,
+        hesitationMs: maxHesitation, screenshotPath: await shot('error'),
+        note: isAuth && !(e instanceof AuthRedirectError)
+          ? `인증 화면으로 리다이렉트됨(${authRedirectHost}) 감지 후 시나리오 실패 — storageState 만료 가능성. 원 오류: ${e.message}`
+          : e.message,
       });
     }
 

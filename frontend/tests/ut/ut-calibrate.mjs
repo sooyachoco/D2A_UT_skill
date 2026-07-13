@@ -41,12 +41,19 @@ function parseSessionLog(filePath) {
   };
 }
 
-/** raw-observations.json (run-ut.mjs 산출) 에서 동일 scenario 의 AI 관측치를 추출한다. */
-function loadAiObservations(jsonPath, scenarioId) {
+// 자동 스캔 관측(a11y-axe-scan/perf-metrics)은 완료 신호가 아니므로 제외한다 — ut-aggregate.mjs 와 동일 관례.
+const AUTO_ACTIONS = new Set(['a11y-axe-scan', 'perf-metrics']);
+
+/** raw-observations.json (run-ut.mjs 산출) 에서 동일 scenario·persona 의 AI 관측치를 추출한다.
+ *  run-ut.mjs 의 finalize() 는 관측 배열을 `results` 필드에 담는다(`observations` 아님) — 여기서
+ *  잘못된 키를 읽으면 실 데이터가 아무리 쌓여도 조용히 빈 배열만 반환되어 캘리브레이션이 항상 N/A 로 나온다. */
+function loadAiObservations(jsonPath, scenarioId, personaId) {
   if (!fs.existsSync(jsonPath)) return [];
   const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-  const records = Array.isArray(raw) ? raw : raw.observations || [];
-  return records.filter((r) => r.scenario === scenarioId);
+  const records = Array.isArray(raw) ? raw : raw.results || [];
+  return records.filter(
+    (r) => r.scenario === scenarioId && r.persona === personaId && !AUTO_ACTIONS.has(r.action)
+  );
 }
 
 const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
@@ -62,11 +69,14 @@ function computeGap(realSessions, aiObservations) {
     ? realSessions.filter((s) => s.completed).length / realSessions.length
     : null;
   const aiCompletionRate = aiObservations.length
-    ? aiObservations.filter((o) => o.success).length / aiObservations.length
+    ? aiObservations.filter((o) => o.completed).length / aiObservations.length
     : null;
 
   const realDurations = realSessions.map((s) => s.durationSec).filter(Boolean);
-  const aiDurations = aiObservations.map((o) => o.durationSec).filter(Boolean);
+  // rec() 은 durationMs(ms 단위, 시나리오 시작 t0 기준 누적)로 기록한다 — durationSec 필드는 없다.
+  const aiDurations = aiObservations
+    .map((o) => (typeof o.durationMs === 'number' ? o.durationMs / 1000 : null))
+    .filter((v) => Number.isFinite(v) && v > 0);
 
   return {
     sampleSize: { real: realSessions.length, ai: aiObservations.length },
@@ -160,7 +170,7 @@ async function main() {
     process.exit(1);
   }
   const realSessions = loadRealSessions(real);
-  const aiObservations = loadAiObservations(ai, scenario);
+  const aiObservations = loadAiObservations(ai, scenario, persona);
   const gap = computeGap(realSessions, aiObservations);
   const suggestions = suggestParamAdjustment(gap, persona);
   const report = renderReport(scenario, persona, gap, suggestions);
