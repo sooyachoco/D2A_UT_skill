@@ -89,6 +89,17 @@ else
   echo "      (cd \"$MCP_DIR\" && npm install && npm run build)"
 fi
 
+# nxbasic-mcp 서버를 프로젝트 .mcp.json 에 등록(자동 실행 아님 — Claude Code 가 최초 사용 시 승인).
+# 실패해도 오버레이 설치 자체는 막지 않는다(부가 기능).
+echo ""
+echo "→ nxbasic-mcp 등록 (DESIGN_SYSTEM=nxbasic 프로젝트용 — 컴포넌트/토큰 조회)…"
+if command -v node >/dev/null 2>&1; then
+  node "$SCRIPT_DIR/scripts/install-nxbasic-mcp.mjs" "$DEST" || \
+    echo "  ⚠️  nxbasic-mcp 등록 건너뜀 — 필요 시 수동: node scripts/install-nxbasic-mcp.mjs \"$DEST\""
+else
+  echo "  ⚠️  node 미설치 — nxbasic-mcp 등록 건너뜀(수동 등록은 INTEGRATION.md 참조)"
+fi
+
 cat <<'EOF'
 
 남은 수동 2단계:

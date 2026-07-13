@@ -204,14 +204,15 @@ Primary 컬러: {값}
 
 #### NX Basic 구현 규칙 (DESIGN_SYSTEM = nxbasic 전용)
 
-`refs/design-systems/nxbasic-1.0v.md` 를 읽고 아래 규칙으로 구현한다 (MCP 미등록 — Storybook WebFetch 조회):
+`refs/design-systems/nxbasic-1.0v.md` 를 읽고 아래 규칙으로 구현한다.
+
+> **토큰·컴포넌트 조회 소스 우선순위**: ① `nxbasic-mcp` 서버(설치기가 프로젝트 `.mcp.json` 에 자동 등록 — `search_design_tokens`·`list_components`·`get_component_docs`) → ② MCP 미승인/부재 시 Storybook `WebFetch` 폴백. 설치기 미실행 등으로 서버가 없으면 `node scripts/install-nxbasic-mcp.mjs <프로젝트루트>` 로 등록하거나 그냥 WebFetch 폴백으로 진행한다.
 
 - **토큰 우선**: 컬러·타이포·여백·radius 는 `design-direction.md` 에 옮겨둔 NX Basic 토큰 값을 사용한다.
-  값이 비어 있으면 Storybook(`colors.css` / `typography.css` / `tokens.ts`)을 WebFetch 로 조회해 채운다.
+  값이 비어 있으면 `nxbasic-mcp` 의 `search_design_tokens` 로 조회하고, 서버가 없으면 Storybook(`colors.css` / `typography.css` / `tokens.ts`)을 WebFetch 로 조회해 채운다.
 - **컴포넌트 매핑**: UI 요소를 NX Basic 18종(Button·TextField·Table·Dialog·Tab·Tag·Toggle 등)에 매핑한다.
   - `nxbasic` 패키지 설치가 가능하면 `import { Button } from 'nxbasic'` 사용을 우선한다.
-  - 설치 불가/사내망 제약 시: 해당 컴포넌트의 Storybook 문서(props·스타일)를 참조하여 동등 컴포넌트를 직접 구현한다.
-    (`.../components-{이름소문자}--docs`)
+  - props·스타일은 `nxbasic-mcp` 의 `get_component_docs` 로 조회한다(서버 없으면 Storybook 문서 `.../components-{이름소문자}--docs` 를 WebFetch).
 - **변주 금지**: 디자인 시스템을 그대로 따르는 것이 목표이므로, NX Basic 토큰/컴포넌트에 임의 장식·변주를 추가하지 않는다.
   `design-quality-guard` 의 "기본 테마 그대로 사용 금지" 규칙은 NX Basic 토큰 준수로 갈음한다.
 

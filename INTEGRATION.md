@@ -67,6 +67,25 @@
 > 페르소나·여정이 필요하면 `ux-research-sync` 로 `refs/ux-research/` SSOT 를 먼저 채운다(가설 페르소나만 있을 때).
 > 실 사용자 세션이 있으면 `real-ut-intake` 로 정규화 후 `node frontend/tests/ut/ut-calibrate.mjs` 로 AI-실측 gap을 확인한다(파라미터 자동 반영 없음 — 사람 검토 필수).
 
+### 3-1b. nxbasic-mcp 서버 자동 등록 (DESIGN_SYSTEM=nxbasic 프로젝트용)
+
+설치기가 `scripts/install-nxbasic-mcp.mjs` 를 호출해 대상 프로젝트 루트(`template/` 있으면 그 안)의
+`.mcp.json` 에 `nxbasic-mcp` 서버를 **등록**한다(기존 `.mcp.json` 의 다른 서버는 보존·병합, 멱등).
+`create-spec`(토큰·컴포넌트 조회)·`design-handoff`(`get_component_docs`) 가 이 서버를 쓴다.
+
+```jsonc
+// .mcp.json 에 병합되는 항목 (플랫폼 자동 분기)
+"nxbasic-mcp": {
+  "command": "npx", "args": ["-y", "mcp-remote", "https://nxbasic-mcp.sooyachoco.workers.dev/mcp"],
+  "env": { "NODE_TLS_REJECT_UNAUTHORIZED": "0" }   // Windows 는 command:"cmd", args:["/c","npx",…]
+}
+```
+
+- **자동 실행 아님** — 프로젝트 `.mcp.json` 은 Claude Code 가 **최초 사용 시 승인 프롬프트**를 띄운다. 사용자 전역 `~/.claude.json` 은 건드리지 않는다(스코프 한정·안전).
+- **폴백** — 서버를 승인하지 않거나 등록을 건너뛰어도 `create-spec` 은 Storybook `WebFetch` 로 폴백하므로 파이프라인은 계속 동작한다.
+- **주의(보안)** — 위 설정은 `NODE_TLS_REJECT_UNAUTHORIZED=0`(TLS 검증 비활성)을 포함한다. 사내 원격 워커 인증서 대응을 위한 것으로 검증된 설정과 동일하나, 팀 배포 시 이 값이 포함됨을 인지할 것.
+- 수동 등록/재실행: `node scripts/install-nxbasic-mcp.mjs <프로젝트 루트>`.
+
 ### 3-2. MCP `dist/` 재빌드 (필수)
 
 MCP 서버는 `dist/` 빌드 산출물을 실행하므로, `task-validator.ts` 병합 후 반드시 재빌드해야 `ut:` 게이트가 활성화된다.

@@ -90,6 +90,23 @@ if ($npm -and (Test-Path (Join-Path $McpDir "package.json"))) {
   Write-Host "  ⚠️  npm 미설치 또는 d2a-mcp-server 부재 — 나중에 수동: cd '$McpDir'; npm install; npm run build"
 }
 
+# nxbasic-mcp 서버를 프로젝트 .mcp.json 에 등록(자동 실행 아님 — Claude Code 가 최초 사용 시 승인).
+# 실패해도 오버레이 설치 자체는 막지 않는다(부가 기능).
+Write-Host ""
+Write-Host "→ nxbasic-mcp 등록 (DESIGN_SYSTEM=nxbasic 프로젝트용 — 컴포넌트/토큰 조회)…"
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) {
+  $mcpInstaller = Join-Path $ScriptDir "scripts/install-nxbasic-mcp.mjs"
+  try {
+    & node $mcpInstaller $Dest
+    if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
+  } catch {
+    Write-Host "  ⚠️  nxbasic-mcp 등록 건너뜀 — 필요 시 수동: node scripts/install-nxbasic-mcp.mjs '$Dest'"
+  }
+} else {
+  Write-Host "  ⚠️  node 미설치 — nxbasic-mcp 등록 건너뜀(수동 등록은 INTEGRATION.md 참조)"
+}
+
 Write-Host ""
 Write-Host "남은 수동 2단계:"
 Write-Host "[*] CLAUDE.md 스킬 표에 신규 5종 등록 + 스킬 수 표기 18개 → 23개"

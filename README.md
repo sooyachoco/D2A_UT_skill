@@ -65,12 +65,13 @@ pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 1. 신규 파일 복사 — UT/게이트 스킬 5종(`ux-research-sync`·`ai-usability-test`·`design-handoff`·`real-ut-intake`·`token-conformance`) + `refs/ux-research/`(SSOT 11종) + `frontend/tests/ut/run-ut.mjs`·`ut-calibrate.mjs` + `frontend/tests/tokens/token-conformance.mjs` + `accessibility` 서브에이전트
 2. 충돌 파일 덮어쓰기(상위호환) — `create-spec.md`·`pre-launch-check.md`·`task-validator.ts` (기존은 `.bak-<timestamp>` 백업)
 3. **MCP 자동 재빌드** — `task-validator.ts` 를 덮어썼으므로 `d2a-mcp-server` 를 `npm install && npm run build` 재빌드해 **`ut:`/`token:` 게이트를 활성화**(구버전 `dist/` 가 게이트를 조용히 죽이는 것 방지)
+4. **nxbasic-mcp 등록** — 프로젝트 `.mcp.json` 에 `nxbasic-mcp` 서버를 병합 등록(기존 서버 보존·멱등). NX Basic 토큰·컴포넌트 조회용. **자동 실행이 아니라** Claude Code 가 최초 사용 시 승인을 물어보며, 승인 안 해도 `create-spec` 은 Storybook WebFetch 로 폴백한다. 전역 `~/.claude.json` 은 건드리지 않는다.
 
 **남은 수동 3스텝 (병합 후 정합성)**
 
-4. `CLAUDE.md` **스킬 표에 신규 5종 등록** + 스킬 수 표기 **18개 → 23개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공). `create-spec`·`pre-launch-check` 은 기존 엔진 스킬 덮어쓰기라 신규 등록 대상이 아니다.
-5. 프로젝트 시작 시 **`ux-research-sync 실행해줘`** 로 SSOT(페르소나·여정·과업)를 실제 데이터로 채움 (채우기 전엔 전 항목 🔵 가설)
-6. `token-conformance`: DESIGN_SYSTEM=nxbasic 프로젝트는 `create-spec` Step 2.7.6이 baseline 동결·`tasks.md` 배선까지 **자동 처리** — 병합 담당자가 따로 할 일 없음. 레거시 소급 적용 등 예외 케이스만 `node frontend/tests/tokens/token-conformance.mjs --update-baseline` 수동 실행 필요(건너뛰면 기존 하드코딩이 전부 신규 위반으로 잡혀 게이트가 즉시 막힘)
+5. `CLAUDE.md` **스킬 표에 신규 5종 등록** + 스킬 수 표기 **18개 → 23개** (미등록 시 CLAUDE.md 규약상 자동 호출 안 됨 — 등록 스니펫은 설치기 콘솔/`INTEGRATION.md` 제공). `create-spec`·`pre-launch-check` 은 기존 엔진 스킬 덮어쓰기라 신규 등록 대상이 아니다.
+6. 프로젝트 시작 시 **`ux-research-sync 실행해줘`** 로 SSOT(페르소나·여정·과업)를 실제 데이터로 채움 (채우기 전엔 전 항목 🔵 가설)
+7. `token-conformance`: DESIGN_SYSTEM=nxbasic 프로젝트는 `create-spec` Step 2.7.6이 baseline 동결·`tasks.md` 배선까지 **자동 처리** — 병합 담당자가 따로 할 일 없음. 레거시 소급 적용 등 예외 케이스만 `node frontend/tests/tokens/token-conformance.mjs --update-baseline` 수동 실행 필요(건너뛰면 기존 하드코딩이 전부 신규 위반으로 잡혀 게이트가 즉시 막힘)
 
 **병합 검증 (선택)**
 
