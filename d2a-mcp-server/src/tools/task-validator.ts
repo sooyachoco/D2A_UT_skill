@@ -137,6 +137,16 @@ async function executeCriterion(
     return checkUtReport(reportPart.trim(), criteriaStr.trim(), cwd);
   }
 
+  // token: {report 경로} :: {token_coverage>=90,token_violations=0}
+  // 디자인 토큰 준수(token-conformance) 리포트의 machine-readable 지표를 임계 검증한다.
+  // 지표: token_coverage(토큰 참조 비율%) / token_violations(신규 하드코딩 건수) 등.
+  // 예: token: specs/001/tokens/TOKEN_CONFORMANCE_REPORT.md :: token_coverage>=90,token_violations=0
+  const tokenTyped = trimmed.match(/^token:\s*(.+?)\s*::\s*(.+)$/i);
+  if (tokenTyped) {
+    const [, reportPart, criteriaStr] = tokenTyped;
+    return checkTokenReport(reportPart.trim(), criteriaStr.trim(), cwd);
+  }
+
   // cmd: {shell command}
   const cmdTyped = trimmed.match(/^cmd:\s*(.+)$/i);
   if (cmdTyped) {
@@ -437,7 +447,73 @@ function checkUtReport(
     };
   }
 
-  // 규칙 파싱 및 평가.
+  return evaluateMetricRules(counts, criteriaStr, reportPath, "UT");
+}
+
+/**
+ * 디자인 토큰 준수 리포트(TOKEN_CONFORMANCE_REPORT.md)를 파싱하여
+ * token-metrics 주석의 지표가 임계 규칙을 모두 만족하는지 확인한다.
+ *
+ * 지표 추출: machine-readable 주석(token-conformance.mjs 산출) 전용.
+ *   <!-- token-metrics: token_coverage=93 token_violations=0 token_hardcoded=10 ... -->
+ * 지원 키: token_coverage(토큰 참조 비율%), token_violations(신규 하드코딩 건수),
+ *          token_hardcoded/token_baseline/token_advisory/color_coverage/type_coverage 등.
+ *
+ * 리포트가 없거나 지표를 못 찾으면 실패로 처리한다(게이트 미실행을 통과로 오인 방지).
+ */
+function checkTokenReport(
+  reportPath: string,
+  criteriaStr: string,
+  cwd: string
+): { passed: boolean; reason: string } {
+  const targetPath = path.resolve(cwd, reportPath);
+
+  let content: string;
+  try {
+    content = fs.readFileSync(targetPath, "utf-8");
+  } catch (e: unknown) {
+    return {
+      passed: false,
+      reason:
+        `token: 리포트 없음 — ${reportPath}\n` +
+        `  token-conformance 게이트를 먼저 실행해 TOKEN_CONFORMANCE_REPORT.md 를 생성하세요.\n` +
+        `  node frontend/tests/tokens/token-conformance.mjs\n` +
+        `  (${(e as Error).message})`,
+    };
+  }
+
+  const counts: Record<string, number> = {};
+  const metricsLine = content.match(/token-metrics:\s*([^\n>]+)/i);
+  if (metricsLine) {
+    for (const pair of metricsLine[1].trim().split(/[\s,]+/)) {
+      const kv = pair.match(/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*(\d+)$/);
+      if (kv) counts[kv[1].toUpperCase()] = parseInt(kv[2], 10);
+    }
+  }
+
+  if (Object.keys(counts).length === 0) {
+    return {
+      passed: false,
+      reason:
+        `token: ${reportPath} 에서 token-metrics 지표를 찾지 못함 — ` +
+        `token-conformance.mjs 로 리포트를 재생성하세요.`,
+    };
+  }
+
+  return evaluateMetricRules(counts, criteriaStr, reportPath, "토큰 준수");
+}
+
+/**
+ * 지표 카운트 맵에 대해 "{key}{op}{value}" 콤마 목록 규칙을 모두 평가한다.
+ * ut:·token: 등 machine-readable 지표 기반 게이트의 공통 평가 엔진.
+ *   지원 연산자: = == != < <= > >=  (키는 대소문자 무관)
+ */
+function evaluateMetricRules(
+  counts: Record<string, number>,
+  criteriaStr: string,
+  reportPath: string,
+  label: string
+): { passed: boolean; reason: string } {
   const rules = criteriaStr.split(",").map((s) => s.trim()).filter(Boolean);
   const failures: string[] = [];
   const checked: string[] = [];
@@ -445,7 +521,7 @@ function checkUtReport(
   for (const rule of rules) {
     const rm = rule.match(/^([A-Za-z][A-Za-z0-9_]*)\s*(==|!=|<=|>=|=|<|>)\s*(\d+)$/i);
     if (!rm) {
-      failures.push(`잘못된 규칙 형식: "${rule}" (예: S4=0, S3<=2, complete>=80)`);
+      failures.push(`잘못된 규칙 형식: "${rule}" (예: S4=0, token_coverage>=90)`);
       continue;
     }
     const level = rm[1].toUpperCase();
@@ -454,7 +530,7 @@ function checkUtReport(
     const actual = counts[level];
 
     if (actual === undefined) {
-      failures.push(`${level} 카운트를 리포트에서 찾지 못함`);
+      failures.push(`${level} 지표를 리포트에서 찾지 못함`);
       continue;
     }
 
@@ -477,13 +553,13 @@ function checkUtReport(
   if (failures.length > 0) {
     return {
       passed: false,
-      reason: `UT 임계 미충족 [${reportPath}]: ${failures.join("; ")} | 관측: ${checked.join(", ")}`,
+      reason: `${label} 임계 미충족 [${reportPath}]: ${failures.join("; ")} | 관측: ${checked.join(", ")}`,
     };
   }
 
   return {
     passed: true,
-    reason: `UT 임계 통과 [${reportPath}]: ${checked.join(", ")}`,
+    reason: `${label} 임계 통과 [${reportPath}]: ${checked.join(", ")}`,
   };
 }
 
