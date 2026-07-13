@@ -243,8 +243,8 @@ bash install.sh <d2a-boilerplate-claude 경로>          # macOS/Linux/Git Bash
 pwsh ./install.ps1 -Target <d2a-boilerplate-claude 경로>  # Windows PowerShell
 ```
 
-설치기는 신규 파일을 복사하고(`frontend/tests/tokens/` 포함) 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은 `.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:`/`token:` 게이트 활성화를 위해 MCP 를 자동 재빌드**한다
-(`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내). 끝나면 콘솔이 남은 수동 단계를 안내한다:
+설치기는 신규 파일을 복사하고(`frontend/tests/tokens/` 포함) 충돌 파일(create-spec·pre-launch-check·accessibility·task-validator)은 `.bak-<timestamp>` 로 백업한 뒤 덮어쓴다. **이어서 `ut:`/`token:` 게이트 활성화를 위해 MCP 를 자동 재빌드**하고
+(`task-validator.ts` 를 덮어썼으므로 필수 — npm 부재 시에만 수동 안내), **`nxbasic-mcp` 서버를 프로젝트 `.mcp.json` 에 병합 등록**한다(전역 config 미변경 — Claude Code 가 최초 사용 시 승인, 미승인 시 WebFetch 폴백). 끝나면 콘솔이 남은 수동 단계를 안내한다:
 
 1. `CLAUDE.md` 스킬 표에 신규 5종(`ux-research-sync`/`ai-usability-test`/`design-handoff`/`real-ut-intake`/`token-conformance`) 등록 + 개수 23개
 2. `token-conformance`: DESIGN_SYSTEM=nxbasic 프로젝트는 `create-spec` Step 2.7.6이 baseline 동결까지 자동 처리 — 예외 케이스(레거시 소급 적용 등)만 `node frontend/tests/tokens/token-conformance.mjs --update-baseline` 1회 수동 실행(기존 하드코딩 면제 — 건너뛰면 게이트가 즉시 막힘)
